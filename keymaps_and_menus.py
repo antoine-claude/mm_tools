@@ -18,7 +18,7 @@ def custom_file_menu_draw(self, context):
     layout.operator_context = 'EXEC_AREA' if context.blend_data.is_saved else 'INVOKE_AREA'
     layout.operator("wm.save_mainfile_incremental", text="Save Incremental", icon='FILE_TICK')
 
-    layout.operator_context = 'EXEC_AREA' if context.blend_data.is_saved else 'INVOKE_AREA'
+    layout.operator_context = 'INVOKE_AREA'
     layout.operator("wm.save_as_mainfile", text="Save As", icon='FILE_TICK')
     layout.separator()
 
@@ -61,3 +61,4 @@ def unregister_keymaps():
     for km, kmi in addon_keymaps:
         km.keymap_items.remove(kmi)
     addon_keymaps.clear()
+
