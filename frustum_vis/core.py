@@ -75,7 +75,6 @@ def update_visibility_from_camera(scene):
             visible = (ndc.z > 0.0 and xmin <= ndc.x <= xmax and ymin <= ndc.y <= ymax)
 
         obj.hide_set(not visible)
-        obj.hide_render = not visible
         obj.hide_viewport = not visible
 
         if visible:
