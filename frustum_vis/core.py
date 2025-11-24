@@ -7,13 +7,27 @@ from bpy_extras.object_utils import world_to_camera_view
 # --------------------------------------------------------------------
 
 def iter_target_objects(scene):
-    """Return objects to process, considering mesh-only and collection filter."""
+    """Return objects to process, considering mesh-only and collection filter.
+    Skip objects that are in any collection whose name starts with "WGT",
+    or objects whose name ends with "EyesExternal_L_geo" or "EyesExternal_R_geo"."""
     only_mesh = scene.frustum_vis_only_mesh
     limit_col = scene.frustum_vis_collection
+
+    def should_skip(obj):
+        # Skip objects in any collection starting with "WGT"
+        for c in obj.users_collection:
+            if c.name.startswith("WGT"):
+                return True
+        # Skip specific eye geometry objects
+        if obj.name.endswith("EyesExternal_L_geo") or obj.name.endswith("EyesExternal_R_geo"):
+            return True
+        return False
 
     if limit_col is None:
         for obj in scene.objects:
             if only_mesh and obj.type != 'MESH':
+                continue
+            if should_skip(obj):
                 continue
             yield obj
         return
@@ -27,6 +41,8 @@ def iter_target_objects(scene):
 
         for obj in col.objects:
             if only_mesh and obj.type != 'MESH':
+                continue
+            if should_skip(obj):
                 continue
             yield obj
 
