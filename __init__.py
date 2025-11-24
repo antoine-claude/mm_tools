@@ -10,7 +10,7 @@ from . import addon_updater_ops
 
 bl_info = {
     "name": "MM Menu",
-    "version": (0, 0, 3),
+    "version": (0, 0, 4),
 }
 
 def menu_func(self, context):
@@ -51,5 +51,6 @@ def unregister():
     # Unregister keymaps
     unregister_keymaps()
     unregister_lod_properties()
+
 
     addon_updater_ops.unregister()
