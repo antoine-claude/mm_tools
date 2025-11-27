@@ -17,7 +17,7 @@ destination_path = 'C:/Users/claud/Downloads'
 
 
 # Version number of addon. NO trailing dot at the end. Should match bl_info in __init__.py
-version_number = '0.0.3'
+version_number = '0.0.5'
 
 # Automatically pack into .zip archive. Needed for installing the addon in Blender.
 pack_to_zip = True

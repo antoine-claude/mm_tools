@@ -4,7 +4,7 @@ import bpy
 # Scene properties
 # --------------------------------------------------------------------
 
-def register_lod_properties():
+def register_frustum_properties():
     scene = bpy.types.Scene
 
     scene.frustum_vis_margin = bpy.props.FloatProperty(
@@ -42,7 +42,7 @@ def register_lod_properties():
     )
 
 
-def unregister_lod_properties():
+def unregister_frustum_properties():
     scene = bpy.types.Scene
     del scene.frustum_vis_margin
     del scene.frustum_vis_auto_update

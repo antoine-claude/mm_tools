@@ -33,9 +33,3 @@ class FRUSTUMVIS_OT_toggle_auto(bpy.types.Operator):
 
         return {'FINISHED'}
 
-
-def get_classes():
-    return (
-        FRUSTUMVIS_OT_update,
-        FRUSTUMVIS_OT_toggle_auto,
-    )
