@@ -1,6 +1,6 @@
 import bpy
 from .core import update_visibility_from_camera
-from .handler import ensure_handler
+from .handler import ensure_frustum_handler
 
 # --------------------------------------------------------------------
 # Operators
@@ -26,7 +26,7 @@ class FRUSTUMVIS_OT_toggle_auto(bpy.types.Operator):
         scene.frustum_vis_auto_update = not scene.frustum_vis_auto_update
 
         if scene.frustum_vis_auto_update:
-            ensure_handler()
+            ensure_frustum_handler()
             self.report({'INFO'}, "Auto-update ENABLED")
         else:
             self.report({'INFO'}, "Auto-update DISABLED")
