@@ -13,7 +13,7 @@ from . import addon_updater_ops
 
 bl_info = {
     "name": "MM Menu",
-    "version": (0, 0, 6),
+    "version": (0, 0, 7),
 }
 
 def menu_func(self, context):

@@ -21,7 +21,7 @@ def iter_target_objects(scene):
         for c in obj.users_collection:
             if c.name.startswith("WGT"):
                 return True
-        if obj.name.endswith("EyesExternal_L_geo") or obj.name.endswith("EyesExternal_R_geo"):
+        if obj.name.endswith("EyesExternal_L_geo") or obj.name.endswith("EyeExternal_L_geo") or obj.name.endswith("EyesExternal_R_geo") or obj.name.endswith("EyeExternal_R_geo"):
             return True
         return False
 
