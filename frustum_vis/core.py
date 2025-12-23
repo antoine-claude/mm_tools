@@ -18,11 +18,22 @@ def iter_target_objects(scene):
     limit_col = scene.frustum_vis_collection
 
     def should_skip(obj):
+        # Hide objects in WGT collections
         for c in obj.users_collection:
             if c.name.startswith("WGT"):
+                if not obj.hide_get():
+                    obj.hide_set(True)
+                    obj.hide_viewport = True
                 return True
-        if obj.name.endswith("EyesExternal_L_geo") or obj.name.endswith("EyeExternal_L_geo") or obj.name.endswith("EyesExternal_R_geo") or obj.name.endswith("EyeExternal_R_geo"):
+
+        # Hide eye objects by name if not already hidden
+        if obj.name.endswith(("EyesExternal_L_geo", "EyeExternal_L_geo",
+                             "EyesExternal_R_geo", "EyeExternal_R_geo")):
+            if not obj.hide_get():
+                obj.hide_set(True)
+                obj.hide_viewport = True
             return True
+
         return False
 
     visited = set()
