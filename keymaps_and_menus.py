@@ -70,6 +70,10 @@ def register_keymaps():
     km.keymap_items.new(
         REGISTERED_KEYMAP_IDS[1], 'S', 'PRESS', shift=True, ctrl=True
     )
+    #Ajouter Ctrl Q pour wm.quit_blender
+    km.keymap_items.new(
+        "wm.quit_blender", 'Q', 'PRESS', ctrl=True
+    )
 
     addon_keymaps.append(("Window", km.name))
 
