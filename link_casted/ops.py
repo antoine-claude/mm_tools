@@ -29,9 +29,18 @@ class LINKCASTED_OT_link_collection(bpy.types.Operator):
             prop_name = f"link_{basename.replace('.', '_')}"
             if hasattr(scene, prop_name) and getattr(scene, prop_name):
                 # Crée la collection parent si elle n'existe pas
-                new_col_name = f"Col_{basename.split('.')[0]}"
+                new_col_name = f"{basename.split('.')[0]}"
                 if new_col_name not in bpy.data.collections:
                     new_col = bpy.data.collections.new(new_col_name)
+                    #Link la nouvelle collection aux col chara, props, env, set
+                    if new_col_name.split('_')[1] == 'CHR':
+                        bpy.data.collections['chara'].children.link(new_col)
+                    elif new_col_name.split('_')[1] == 'PRP':
+                        bpy.data.collections['props'].children.link(new_col)
+                    elif new_col_name.split('_')[1] == 'ITM':
+                        bpy.data.collections['set'].children.link(new_col)
+                    else:
+                        bpy.data.collections['env'].children.link(new_col)
                     context.scene.collection.children.link(new_col)
                 else:
                     new_col = bpy.data.collections[new_col_name]

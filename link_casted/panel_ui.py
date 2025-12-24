@@ -15,13 +15,17 @@ class VIEW3D_PT_link_casted(bpy.types.Panel):
         scene = context.scene
         candidates = find_file(match_shot())
 
-        # Affiche les checkboxes
+        # Affiche les checkboxes if col already exist icon error
         link_col = layout.column()
         for path in candidates:
             basename = os.path.basename(path)
             prop_name = f"link_{basename.replace('.', '_')}"
             if hasattr(scene, prop_name):
-                link_col.prop(scene, prop_name, text=basename.split(".")[0])
+                row = link_col.row()
+                row.prop(scene, prop_name, text=basename.split(".")[0])
+                # Add error icon if collection already exists
+                if bpy.data.collections.get(basename.split(".")[0]):
+                    row.label(icon='ERROR')
 
         op_row = layout.row()
         # Bouton pour charger les fichiers

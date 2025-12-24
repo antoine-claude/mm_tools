@@ -167,6 +167,8 @@ class WM_OT_save_mainfile_incremental(bpy.types.Operator):
             comment = context.scene.save_comment
 
         parsed, _ = parsed_filepath(filepath)
+        # Save with incremented version
+        new_filepath = save_with_incremental(filepath)
 
         # If filename doesn't contain vXX, infer next version from JSON log
         if not parsed[-2].startswith("v"):
@@ -185,9 +187,7 @@ class WM_OT_save_mainfile_incremental(bpy.types.Operator):
             parsed[-2] = last_version
 
         # Write JSON log entry (version, comment)
-        write_log(filepath, parsed[-2], comment)
-        # Save with incremented version
-        save_with_incremental(filepath)
+        write_log(new_filepath, parsed[-2], comment)
 
         # nettoyage
         comment = ""
