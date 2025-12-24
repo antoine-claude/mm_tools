@@ -12,12 +12,14 @@ import json
 def purge_unused_data():
     bpy.ops.outliner.orphans_purge(do_recursive=True)
 
-def increment_number(filepath):
+def parsed_filepath(filepath):
     base_name = os.path.basename(filepath)
     name, ext = os.path.splitext(base_name)
     parsed = name.split('_')
+    return parsed, ext
 
-
+def increment_number(parsed_filepath):
+    parsed, ext = parsed_filepath
     # gestion vXX
     if len(parsed) > 1 and parsed[-2].startswith("v"):
         current_version = int(parsed[-2][1:])
@@ -25,6 +27,8 @@ def increment_number(filepath):
         parsed[-2] = f"v{new_version:02d}"
 
     return parsed, ext
+
+
 
 def save_with_incremental(filepath=None):
     purge_unused_data()
@@ -36,7 +40,7 @@ def save_with_incremental(filepath=None):
         print("No file path specified for saving.")
         return
 
-    parsed, ext = increment_number(filepath)
+    parsed, ext = increment_number(parsed_filepath(filepath))
 
     new_name = '_'.join(parsed) + ext
     new_filepath = os.path.join(os.path.dirname(filepath), new_name)
@@ -162,9 +166,7 @@ class WM_OT_save_mainfile_incremental(bpy.types.Operator):
             # panel
             comment = context.scene.save_comment
 
-        # --- Log + Save ---
-        new_filepath = save_with_incremental(filepath)
-        parsed, _ = increment_number(filepath)
+        parsed, _ = parsed_filepath(filepath)
 
         # If filename doesn't contain vXX, infer next version from JSON log
         if not parsed[-2].startswith("v"):
@@ -179,10 +181,13 @@ class WM_OT_save_mainfile_incremental(bpy.types.Operator):
                         last_version = f"v{current_version + 1:02d}"
                 except Exception:
                     pass
+            print("update parsed version to", last_version)
             parsed[-2] = last_version
 
         # Write JSON log entry (version, comment)
-        write_log(new_filepath, parsed[-2], comment)
+        write_log(filepath, parsed[-2], comment)
+        # Save with incremented version
+        save_with_incremental(filepath)
 
         # nettoyage
         comment = ""
