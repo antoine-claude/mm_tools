@@ -9,5 +9,6 @@ def preload_modules():
     from . import wheels
     wheels.load_wheels_global_together(
         "openpyxl",
-        ["openpyxl", "et_xmlfile"]
+        ["openpyxl", "et_xmlfile", "gazu", ]
+
     )

@@ -22,16 +22,14 @@ def iter_target_objects(scene):
         for c in obj.users_collection:
             if c.name.startswith("WGT"):
                 if not obj.hide_get():
-                    obj.hide_set(True)
-                    obj.hide_viewport = True
+                    safe_hide(obj, True)
                 return True
 
         # Hide eye objects by name if not already hidden
         if obj.name.endswith(("EyesExternal_L_geo", "EyeExternal_L_geo",
                              "EyesExternal_R_geo", "EyeExternal_R_geo")):
             if not obj.hide_get():
-                obj.hide_set(True)
-                obj.hide_viewport = True
+                safe_hide(obj, True)
             return True
 
         return False
@@ -86,6 +84,41 @@ def iter_target_objects(scene):
     # Otherwise, scan the specified collection and its children
     yield from scan(limit_col)
 
+
+def safe_hide(obj, value):
+    """Safely hide an object in the current view layer if possible.
+
+    Some objects (e.g. linked library objects or instances not present in the
+    active view layer) raise RuntimeError when calling `hide_set`. This helper
+    attempts to call `hide_set` only when the object is present in the
+    current view layer, and always sets `hide_viewport` as a fallback.
+    """
+    # Try to use hide_set when possible; some objects (linked/not in view layer)
+    # can raise RuntimeError or TypeError when calling hide_set. Fall back to
+    # setting hide_viewport if hide_set isn't possible. Swallow any errors to
+    # avoid crashing Blender.
+    try:
+        try:
+            obj.hide_set(value)
+        except (RuntimeError, TypeError):
+            # hide_set not supported for this object in current context
+            try:
+                obj.hide_viewport = value
+            except Exception:
+                pass
+        else:
+            # hide_set succeeded; still attempt to set hide_viewport, ignoring errors
+            try:
+                obj.hide_viewport = value
+            except Exception:
+                pass
+    except Exception:
+        # Defensive: if anything unexpected happens, attempt hide_viewport once
+        try:
+            obj.hide_viewport = value
+        except Exception:
+            pass
+
 # --------------------------------------------------------------------
 # Main visibility logic
 # --------------------------------------------------------------------
@@ -129,8 +162,7 @@ def update_visibility_from_camera(scene):
         # -------------------------------------------------------------
         # APPLY VISIBILITY — Works also on linked objects
         # -------------------------------------------------------------
-        obj.hide_set(not visible)
-        obj.hide_viewport = not visible
+        safe_hide(obj, not visible)
 
         if visible:
             visible_count += 1

@@ -1,7 +1,18 @@
+from multiprocessing import context
 import bpy
 
 # Updater ops import, all setup in this file.
 from . import addon_updater_ops
+
+# Try to reuse Kitsu helpers (fall back to safe defaults if missing)
+try:
+    from .kitsu.kitsu_login_topbar import get_projects_enum, on_project_update, external_update_kitsu_host, _cached_projects
+except Exception:
+    get_projects_enum = lambda self, context: [("NONE", "-- Select a project --", "")]
+    on_project_update = lambda self, context: None
+    external_update_kitsu_host = lambda self, context: None
+    _cached_projects = [("NONE", "-- Select a project --", "")]
+
 
 
 class DemoUpdaterPanel(bpy.types.Panel):
@@ -48,40 +59,101 @@ class DemoPreferences(bpy.types.AddonPreferences):
 
     # Addon updater preferences.
 
-    auto_check_update = bpy.props.BoolProperty(
-        name="Auto-check for Update",
-        description="If enabled, auto-check for updates using an interval",
-        default=False)
+    auto_check_update = bpy.props.BoolProperty(name="Auto-check for Update",description="If enabled, auto-check for updates using an interval",default=False)
+    updater_interval_months = bpy.props.IntProperty(name='Months',description="Number of months between checking for updates",default=0,min=0)
+    updater_interval_days = bpy.props.IntProperty(name='Days',description="Number of days between checking for updates",default=7,min=0,max=31)
+    updater_interval_hours = bpy.props.IntProperty(name='Hours',description="Number of hours between checking for updates",default=0,min=0,max=23)
+    updater_interval_minutes = bpy.props.IntProperty(name='Minutes',description="Number of minutes between checking for updates",default=0,min=0,max=59)
 
-    updater_interval_months = bpy.props.IntProperty(
-        name='Months',
-        description="Number of months between checking for updates",
-        default=0,
-        min=0)
+    # Kitsu preferences (centralized here for the addon)
+    kitsu_link = bpy.props.StringProperty(
+        name="Kitsu Link",
+        description="Lien vers le serveur Kitsu",
+        default="https://kitsu.20stm-prod.be/api",
+        update=external_update_kitsu_host
+    )
 
-    updater_interval_days = bpy.props.IntProperty(
-        name='Days',
-        description="Number of days between checking for updates",
-        default=7,
-        min=0,
-        max=31)
+    project_id = bpy.props.EnumProperty(
+        name="Project",
+        items=get_projects_enum,
+        update=on_project_update
+    )
 
-    updater_interval_hours = bpy.props.IntProperty(
-        name='Hours',
-        description="Number of hours between checking for updates",
-        default=0,
-        min=0,
-        max=23)
-
-    updater_interval_minutes = bpy.props.IntProperty(
-        name='Minutes',
-        description="Number of minutes between checking for updates",
-        default=0,
-        min=0,
-        max=59)
+    saved_username = bpy.props.StringProperty(default="")
+    saved_password = bpy.props.StringProperty(subtype="PASSWORD", default="")
+    remember_credentials = bpy.props.BoolProperty(default=False)
 
     def draw(self, context):
         layout = self.layout
+
+        # Quick Kitsu status (prepended)
+        try:
+            from .kitsu.kitsu_login_topbar import _kitsu_reachable, _kitsu_user, _cached_projects
+        except Exception:
+            _kitsu_reachable = False
+            _kitsu_user = None
+            _cached_projects = [("NONE", "-- Select a project --", "")]
+
+        # Find Kitsu prefs robustly (check known names then scan)
+        kprefs = None
+        for name in ( __package__, "mm_tools", "mm_tools.kitsu"):
+            try:
+                kprefs = context.preferences.addons[name].preferences
+                break
+            except Exception:
+                kprefs = None
+
+        if kprefs is None:
+            for name in context.preferences.addons.keys():
+                try:
+                    p = context.preferences.addons[name].preferences
+                    if hasattr(p, "kitsu_link"):
+                        kprefs = p
+                        break
+                except Exception:
+                    continue
+
+        if kprefs:
+            layout.prop(kprefs, "kitsu_link")
+            if not _kitsu_reachable:
+                layout.label(text="Kitsu server unreachable", icon='ERROR')
+                layout.operator("kitsu.reconnect", text="Reconnect")
+            else:
+                if _kitsu_user:
+                    # Show active project from cached projects
+                    project_name = None
+                    for pid, name, _ in _cached_projects:
+                        if pid == kprefs.project_id:
+                            project_name = name
+                            break
+                    if project_name and kprefs.project_id != "NONE":
+                        layout.label(text=f"Active project: {project_name}")
+                    else:
+                        layout.label(text="No project selected")
+                    layout.separator()
+                    layout.label(text=f"Logged as: {_kitsu_user.get('full_name','')}")
+                    row = layout.row()
+                    row.prop(kprefs, "remember_credentials")
+                    if kprefs.remember_credentials and kprefs.saved_username:
+                        layout.label(text=f"Saved user: {kprefs.saved_username}")
+                else:
+                    layout.label(text="Not logged to Kitsu")
+                    layout.separator()
+                    layout.label(text="Saved credentials:")
+                    row = layout.row()
+                    row.prop(kprefs, "remember_credentials")
+                    if kprefs.remember_credentials and kprefs.saved_username:
+                        row = layout.row()
+                        row.label(text=f"Saved user: {kprefs.saved_username}")
+        else:
+            layout.label(text="Not logged to Kitsu")
+            layout.separator()
+            layout.label(text="Saved credentials:")
+            row = layout.row()
+            row.prop(self, "remember_credentials")
+            if self.remember_credentials and self.saved_username:
+                row = layout.row()
+                row.label(text=f"Saved user: {self.saved_username}")
 
         # Works best if a column, or even just self.layout.
         mainrow = layout.row()
