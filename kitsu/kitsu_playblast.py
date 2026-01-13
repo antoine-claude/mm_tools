@@ -1,6 +1,7 @@
 import bpy
 import gazu
 _cached_tasks = [("NONE", "-- Select a task --", "")]
+_cached_task_statuses = [("NONE", "-- Select a task status --", "")]
 ADDON_NAME = "mm_tools"
 
 
@@ -39,7 +40,6 @@ def get_current_shot():
 
 # TASK ENUM
 
-
 def load_tasks_for_project(project_id):
     global _cached_tasks
 
@@ -60,9 +60,31 @@ def load_tasks_for_project(project_id):
         )
 
 
+def load_tasks_status_for_project(project_id):
+    # display all short_name in all_task_statuses_for_project similar to load_tasks_for_project
+    global _cached_task_statuses
+
+    if project_id == "NONE":
+        _cached_task_statuses = [("NONE", "-- Select a task status --", "")]
+        return
+
+    shot = get_current_shot()
+    if not shot:
+        _cached_task_statuses = [("NONE", "-- Select a task status --", "")]
+        return
+
+    statuses = gazu.task.all_task_statuses_for_project(project_id)
+    _cached_task_statuses = [("NONE", "-- Select a task status --", "")]
+    for status in statuses:
+        _cached_task_statuses.append(
+            (status["id"], status["name"], status["name"])
+        )
+
 def get_tasks_enum(self, context):
     return _cached_tasks
 
+def get_tasks_status_enum(self, context):
+    return _cached_task_statuses
 
 # --------------------------------------------------
 # OPERATOR
@@ -78,30 +100,27 @@ class KITSU_OT_Playblast(bpy.types.Operator):
             self.report({'ERROR'}, "No shot found")
             return {'CANCELLED'}
         
-        tasks = gazu.task.all_tasks_for_shot(shot)
-        for task in tasks:
-            if task["id"] == context.scene.kitsu_playblast_task:
-                task_id = task
-                break
-            
-        if task_id == "NONE":
+        selected_task_id = context.scene.kitsu_playblast_task
+        if not selected_task_id or selected_task_id == "NONE":
             self.report({'ERROR'}, "No task selected")
             return {'CANCELLED'}
 
-
         # Logique pour le playblast et l'envoi vers Kitsu
-        bpy.ops.render.opengl(animation=True, view_context=False)
+        bpy.ops.render.opengl(animation=True, view_context=True)
 
-        # publish du preview/playblast vers Kitsu avec le statut WIP
+        # Publish preview/playblast to Kitsu with selected status (ID or fallback to 'wip')
         comment = bpy.context.scene.get("comment_playblast", "")
         preview_file_path = bpy.context.scene.render.filepath
-        #task_status (str / dict) – The task status dict or ID. 
-        task_status = gazu.task.get_task_status_by_short_name("wip")
-        if task_id and preview_file_path:
+        selected_status = context.scene.kitsu_playblast_task_status
+        if not selected_status or selected_status == "NONE":
+            task_status = gazu.task.get_task_status_by_short_name("wip")
+        else:
+            task_status = selected_status
+
+        if selected_task_id and preview_file_path:
             try:
-                # Publier l'aperçu
                 gazu.task.publish_preview(
-                    task=task_id,
+                    task=selected_task_id,
                     comment=comment,
                     preview_file_path=preview_file_path,
                     task_status=task_status
@@ -143,6 +162,7 @@ class KITSU_PT_PlayblastPanel(bpy.types.Panel):
             return
 
         layout.prop(context.scene, "kitsu_playblast_task", text="Task")
+        layout.prop(context.scene, "kitsu_playblast_task_status", text="Task Status")
         layout.prop(context.scene, "comment_playblast", text="Comment")
         layout.operator("kitsu.playblast", text="Playblast & Send to Kitsu", icon='RENDER_ANIMATION')
 
@@ -156,11 +176,16 @@ def register_properties():
         name="Task",
         items=get_tasks_enum,
     )
-
+    bpy.types.Scene.kitsu_playblast_task_status = bpy.props.EnumProperty(
+        name="Task Status",
+        items=get_tasks_status_enum,
+    )
 
 def unregister_properties():
     if hasattr(bpy.types.Scene, "kitsu_playblast_task"):
         del bpy.types.Scene.kitsu_playblast_task
+    if hasattr(bpy.types.Scene, "kitsu_playblast_task_status"):
+        del bpy.types.Scene.kitsu_playblast_task_status
 
 
 # --------------------------------------------------
@@ -172,6 +197,7 @@ def load_tasks_on_file_load(dummy):
     try:
         prefs = bpy.context.preferences.addons[ADDON_NAME].preferences
         load_tasks_for_project(prefs.project_id)
+        load_tasks_status_for_project(prefs.project_id)
     except Exception:
         pass
 
