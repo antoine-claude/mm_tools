@@ -15,7 +15,7 @@ from . import addon_updater_ops
 
 bl_info = {
     "name": "MM Menu",
-    "version": (0, 0, 8, 3),
+    "version": (0, 0, 8, 31),
 }
 
 def menu_func(self, context):
@@ -78,5 +78,6 @@ def unregister():
     for prop in list(bpy.types.Scene.bl_rna.properties):
         if prop.identifier.startswith("link_"):
             delattr(bpy.types.Scene, prop.identifier)
+
 
     addon_updater_ops.unregister()
