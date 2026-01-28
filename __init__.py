@@ -7,16 +7,23 @@ from .keymaps_and_menus import ( custom_file_menu_draw, register_keymaps, unregi
 from .kitsu import (get_kitsu_classes,ensure_kitsu_handlers,remove_kitsu_handlers, register_kitsu_ui, register_kitsu_properties, unregister_kitsu_ui, unregister_kitsu_properties)
 from . import (lighting, alert_path, anim_utils, toolbar_menu, frustum_vis, link_casted)
 from . import addon_updater_ops
+from . import updater_ui
 
 bl_info = {
     "name": "MM Tools",
     "author": "Antoine C",
-    "version": (0, 0, 8, 4),
+    "version": (0, 0, 8, 40),
 }
-
+classes = (
+    updater_ui.DemoPreferences,
+)
     
 def register():
     addon_updater_ops.register(bl_info)
+
+    for cls in classes:
+        addon_updater_ops.make_annotations(cls)  # Avoid blender 2.8 warnings.
+        bpy.utils.register_class(cls)
     # register lighting package (registers its UI and classes)
     lighting.register()
     alert_path.register()
@@ -32,7 +39,6 @@ def register():
     
     # Register handlers
     ensure_kitsu_handlers()
-    
 
     # bpy.types.TOPBAR_MT_editor_menus.append(register_kitsu_ui)
     bpy.types.TOPBAR_MT_file.draw = custom_file_menu_draw
@@ -75,5 +81,8 @@ def unregister():
         if prop.identifier.startswith("link_"):
             delattr(bpy.types.Scene, prop.identifier)
 
+
+    for cls in reversed(classes):
+        bpy.utils.unregister_class(cls)
 
     addon_updater_ops.unregister()
