@@ -23,11 +23,20 @@ class VIEW3D_PT_frustum_visibility(bpy.types.Panel):
 
         col.separator()
         row = col.row(align=True)
-        row.prop(scene, "frustum_vis_auto_update", text="Auto-update")
+        row.prop(scene.frustum_vis_props, "frustum_vis_auto_update", text="Auto-update")
         row.operator("frustumvis.toggle_auto_update", text="", icon='REC')
 
         col.separator()
-        col.prop(scene, "frustum_vis_margin")
-        col.prop(scene, "frustum_vis_only_mesh")
-        col.prop(scene, "frustum_vis_collection")
-        col.prop(scene, "frustum_vis_frame_step")
+        col.prop(scene.frustum_vis_props, "frustum_vis_margin")
+        col.prop(scene.frustum_vis_props, "frustum_vis_only_mesh")
+        col.prop(scene.frustum_vis_props, "frustum_vis_collection")
+        col.prop(scene.frustum_vis_props, "frustum_vis_frame_step")
+
+classes = (VIEW3D_PT_frustum_visibility,)
+
+def register():
+    for cls in classes:
+        bpy.utils.register_class(cls)
+def unregister():
+    for cls in reversed(classes):
+        bpy.utils.unregister_class(cls)

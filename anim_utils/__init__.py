@@ -1,20 +1,36 @@
-from .op_bake_pas2 import *
-from .op_libraries_remapper import *
-from .op_append_last_frame import *
-from .op_control_version import *
+import importlib
+from . import (op_append_last_frame, op_bake_pas2, op_control_version, op_libraries_remapper, op_save_increment,)
 
-from .op_save_increment import *
-from ..updater_ui import *
+# ---------REGISTER ----------.
 
 
-# facultatif : une liste globale des classes si tu veux
-def get_anim_utils_classes():
-    from .op_bake_pas2 import classes as bake_anim_classes
-    from .op_libraries_remapper import classes as libraries_remapper_classes
-    from .op_append_last_frame import classes as last_frame_classes
-    from .op_save_increment import classes as save_classes
-    from .op_control_version import classes as control_version_classes
-    from ..updater_ui import classes as draw_update_classes
+def reload():
+    global ops_append_last_frame
+    global op_bake_pas2
+    global op_control_version
+    global op_libraries_remapper
+    global op_save_increment
+
+    ui = importlib.reload(ui)
+    ops_append_last_frame = importlib.reload(ops_append_last_frame)
+    op_bake_pas2 = importlib.reload(op_bake_pas2)
+    op_control_version = importlib.reload(op_control_version)
+    op_libraries_remapper = importlib.reload(op_libraries_remapper)
+    op_save_increment = importlib.reload(op_save_increment)
 
 
-    return bake_anim_classes + libraries_remapper_classes + last_frame_classes + save_classes + control_version_classes + draw_update_classes
+
+def register():
+    op_append_last_frame.register()
+    op_bake_pas2.register()
+    op_control_version.register()
+    op_libraries_remapper.register()
+    op_save_increment.register()
+
+
+def unregister():
+    op_append_last_frame.unregister()
+    op_bake_pas2.unregister()
+    op_control_version.unregister()
+    op_libraries_remapper.unregister()
+    op_save_increment.unregister()

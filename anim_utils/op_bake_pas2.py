@@ -59,4 +59,13 @@ class OBJECT_OT_bake_pas2(bpy.types.Operator):
 
 
 # --- Fonction de dessin dans le menu Object ---
-classes = [OBJECT_OT_bake_pas2]
+
+classes = (OBJECT_OT_bake_pas2,)
+
+def register():
+    for c in classes:
+        bpy.utils.register_class(c)
+    
+def unregister():
+    for c in classes:
+        bpy.utils.unregister_class(c)

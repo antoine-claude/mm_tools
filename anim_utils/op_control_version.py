@@ -132,6 +132,12 @@ class VIEW3D_PT_control_version_info(bpy.types.Panel):
 # Register
 # ------------------------------------------------
 
-classes = [
-    VIEW3D_PT_control_version_info,
-]
+classes = (VIEW3D_PT_control_version_info,)
+
+def register():
+    for c in classes:
+        bpy.utils.register_class(c)
+    
+def unregister():
+    for c in classes:
+        bpy.utils.unregister_class(c)

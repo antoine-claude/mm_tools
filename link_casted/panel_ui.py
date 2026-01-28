@@ -1,34 +1,36 @@
 # link_casted/panel_ui.py
 import bpy
-import os
-from .core import match_shot, find_file
 
 class VIEW3D_PT_link_casted(bpy.types.Panel):
     bl_label = "Link Casted"
-    bl_idname = "VIEW3D_PT_link_casted_panel"
+    bl_idname = "LINKCASTED_PT_panel"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = 'Link Casted'
+    bl_category = 'LinkCasted'
 
     def draw(self, context):
         layout = self.layout
         scene = context.scene
-        candidates = find_file(match_shot())
 
-        # Affiche les checkboxes if col already exist icon error
-        link_col = layout.column()
-        for path in candidates:
-            basename = os.path.basename(path)
-            prop_name = f"link_{basename.replace('.', '_')}"
-            if hasattr(scene, prop_name):
-                row = link_col.row()
-                row.prop(scene, prop_name, text=basename.split(".")[0])
-                # Add error icon if collection already exists
-                if bpy.data.collections.get(basename.split(".")[0]):
-                    row.label(icon='ERROR')
+        if any(prop.startswith("link_") for prop in dir(scene)):
+            box = layout.box()
+            for prop in dir(scene):
+                if prop.startswith("link_"):
+                    row = box.row()
+                    row.prop(scene, prop)
 
-        op_row = layout.row()
-        # Bouton pour charger les fichiers
-        op_row.operator("linkcasted.load_files", text="Load Files")
-        # Bouton pour linker les collections
-        op_row.operator("linkcasted.link_collection", text="Link Checked Collections")
+
+        else :
+            layout.label(text="Pas d'assets trouvés.")
+        layout.operator("linkcasted.load_files", icon="FILE_REFRESH")
+        layout.operator("linkcasted.link_asset_to_collection", icon="FILE_REFRESH")
+
+
+classes = (VIEW3D_PT_link_casted,)
+
+def register():
+    for cls in classes:
+        bpy.utils.register_class(cls)
+def unregister():
+    for cls in reversed(classes):
+        bpy.utils.unregister_class(cls)

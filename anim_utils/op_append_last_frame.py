@@ -81,4 +81,11 @@ class WM_OT_append_previous_frame(bpy.types.Operator):
         return {'FINISHED'}
 
 
-classes = [WM_OT_append_previous_frame]
+classes = (WM_OT_append_previous_frame,)
+
+def register():
+    for c in classes:
+        bpy.utils.register_class(c)
+def unregister():
+    for c in classes:
+        bpy.utils.unregister_class(c)

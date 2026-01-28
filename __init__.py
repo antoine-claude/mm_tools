@@ -3,47 +3,41 @@ from . import dependencies
 dependencies.preload_modules()
 
 import bpy
-from .anim_utils import ( get_anim_utils_classes )
-from .toolbar_menu import VIEW3D_MT_MM
 from .keymaps_and_menus import ( custom_file_menu_draw, register_keymaps, unregister_keymaps )
-from .frustum_vis import ( get_frv_classes, register_frustum_properties, unregister_frustum_properties, ensure_frustum_handler, remove_frustum_handler )
-from .link_casted import (get_link_casted_classes)
-from .alert_path import (get_alert_path_classes, ensure_alert_handlers, remove_alert_handlers, draw_alert_menu)
 from .kitsu import (get_kitsu_classes,ensure_kitsu_handlers,remove_kitsu_handlers, register_kitsu_ui, register_kitsu_properties, unregister_kitsu_ui, unregister_kitsu_properties)
-
+from . import (lighting, alert_path, anim_utils, toolbar_menu, frustum_vis, link_casted)
 from . import addon_updater_ops
 
 bl_info = {
-    "name": "MM Menu",
-    "version": (0, 0, 8, 31),
+    "name": "MM Tools",
+    "author": "Antoine C",
+    "version": (0, 0, 8, 4),
 }
 
-def menu_func(self, context):
-    self.layout.menu("VIEW3D_MT_MM")
     
 def register():
     addon_updater_ops.register(bl_info)
+    # register lighting package (registers its UI and classes)
+    lighting.register()
+    alert_path.register()
+    anim_utils.register()
+    toolbar_menu.register()
+    frustum_vis.register()
+    link_casted.register()
     
     # Register all classes
-    for cls_group in [get_anim_utils_classes(), get_frv_classes(), 
-                      get_link_casted_classes(), get_alert_path_classes(), get_kitsu_classes()]:
+    for cls_group in [ get_kitsu_classes()]:
         for cls in cls_group:
             bpy.utils.register_class(cls)
     
     # Register handlers
-    ensure_frustum_handler()
-    ensure_alert_handlers()
     ensure_kitsu_handlers()
     
-    # Register UI
-    bpy.utils.register_class(VIEW3D_MT_MM)
+
     # bpy.types.TOPBAR_MT_editor_menus.append(register_kitsu_ui)
-    bpy.types.TOPBAR_MT_editor_menus.append(draw_alert_menu)
-    bpy.types.VIEW3D_MT_editor_menus.append(menu_func)
     bpy.types.TOPBAR_MT_file.draw = custom_file_menu_draw
     
     # Register keymaps and properties
-    register_frustum_properties()
     register_keymaps()
     register_kitsu_ui()
     register_kitsu_properties()
@@ -51,26 +45,28 @@ def register():
 def unregister():
     # Unregister keymaps and properties first
     unregister_keymaps()
-    unregister_frustum_properties()
+
+    # unregister lighting package
+    lighting.unregister()
+    alert_path.unregister()
+    anim_utils.unregister()
+    toolbar_menu.unregister()
+    frustum_vis.unregister()
+    link_casted.unregister()
     
     # Unregister UI
-    bpy.types.VIEW3D_MT_editor_menus.remove(menu_func)
-    bpy.types.TOPBAR_MT_editor_menus.remove(draw_alert_menu)
     # bpy.types.TOPBAR_MT_editor_menus.remove(register_kitsu_ui)
     if hasattr(bpy.types.TOPBAR_MT_file, "draw"):
         del bpy.types.TOPBAR_MT_file.draw
-    bpy.utils.unregister_class(VIEW3D_MT_MM)
+
     
     # Unregister handlers
-    remove_frustum_handler()
-    remove_alert_handlers()
     remove_kitsu_handlers()
     unregister_kitsu_ui()
     unregister_kitsu_properties()
     
     # Unregister all classes in reverse order
-    for cls_group in [get_alert_path_classes(), get_link_casted_classes(),
-                      get_frv_classes(), get_anim_utils_classes(), get_kitsu_classes()]:
+    for cls_group in [get_kitsu_classes()]:
         for cls in reversed(cls_group):
             bpy.utils.unregister_class(cls)
     

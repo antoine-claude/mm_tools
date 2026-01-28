@@ -2,7 +2,7 @@
 import bpy
 import os
 from .properties import update_scene_properties
-from .core import find_file, match_shot
+from .core import find_file, match_shot, link_collection_matching_filename
 
 class LINKCASTED_OT_load_files(bpy.types.Operator):
     bl_idname = "linkcasted.load_files"
@@ -12,45 +12,42 @@ class LINKCASTED_OT_load_files(bpy.types.Operator):
     def execute(self, context):
         scene = context.scene
         update_scene_properties(scene)
+        if context.area:
+            context.area.tag_redraw()
+
         return {'FINISHED'}
 
 
 class LINKCASTED_OT_link_collection(bpy.types.Operator):
-    bl_idname = "linkcasted.link_collection"
+    bl_idname = "linkcasted.link_asset_to_collection"
     bl_label = "Link Collections"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
         scene = context.scene
         candidates = find_file(match_shot())
-
+        
         for path in candidates:
-            basename = os.path.basename(path)
-            prop_name = f"link_{basename.replace('.', '_')}"
-            if hasattr(scene, prop_name) and getattr(scene, prop_name):
+            basename = os.path.basename(path).replace(".blend", "")
+            prop_name = f"link_{basename}"
+
+            if getattr(scene, prop_name, False):
                 # Crée la collection parent si elle n'existe pas
-                new_col_name = f"{basename.split('.')[0]}"
-                if new_col_name not in bpy.data.collections:
-                    new_col = bpy.data.collections.new(new_col_name)
-                    #Link la nouvelle collection aux col chara, props, env, set
-                    if new_col_name.split('_')[1] == 'CHR':
-                        bpy.data.collections['chara'].children.link(new_col)
-                    elif new_col_name.split('_')[1] == 'PRP':
-                        bpy.data.collections['props'].children.link(new_col)
-                    elif new_col_name.split('_')[1] == 'ITM':
-                        bpy.data.collections['set'].children.link(new_col)
-                    else:
-                        bpy.data.collections['env'].children.link(new_col)
-                    context.scene.collection.children.link(new_col)
-                else:
-                    new_col = bpy.data.collections[new_col_name]
-
-                # Link les collections du fichier .blend
-                with bpy.data.libraries.load(path, link=True) as (data_from, data_to):
-                    data_to.collections = data_from.collections
-
-                for coll in data_to.collections:
-                    if coll is not None:
-                        new_col.children.link(coll)
+                link_collection_matching_filename(path)
 
         return {'FINISHED'}
+#register unregister property
+classes = (LINKCASTED_OT_load_files, LINKCASTED_OT_link_collection)
+
+def register():
+    for cls in classes:
+        bpy.utils.register_class(cls)
+def unregister():
+    for cls in reversed(classes):
+        bpy.utils.unregister_class(cls)
+        # Remove dynamic scene properties created by update_scene_properties (named like "link_<basename>")
+        for attr in [a for a in dir(bpy.types.Scene) if a.startswith("link_")]:
+            try:
+                delattr(bpy.types.Scene, attr)
+            except Exception:
+                pass

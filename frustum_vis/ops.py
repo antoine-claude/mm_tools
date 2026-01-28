@@ -1,6 +1,25 @@
 import bpy
 from .core import update_visibility_from_camera
-from .handler import ensure_frustum_handler
+
+
+def frustum_vis_frame_handler(scene):
+    if not scene.frustum_vis_auto_update:
+        return
+
+    step = max(scene.frustum_vis_frame_step, 1)
+    if scene.frame_current % step != 0:
+        return
+
+    update_visibility_from_camera(scene)
+
+
+
+
+def ensure_frustum_handler():
+    handlers = bpy.app.handlers.frame_change_post
+    if frustum_vis_frame_handler not in handlers:
+        handlers.append(frustum_vis_frame_handler)
+
 
 # --------------------------------------------------------------------
 # Operators
@@ -19,7 +38,7 @@ class FRUSTUMVIS_OT_update(bpy.types.Operator):
 class FRUSTUMVIS_OT_toggle_auto(bpy.types.Operator):
     """Toggle automatic update on frame change"""
     bl_idname = "frustumvis.toggle_auto_update"
-    bl_label = "Toggle Auto-Update"
+    bl_label = "Toggle Auto-Update"  
 
     def execute(self, context):
         scene = context.scene
@@ -33,3 +52,14 @@ class FRUSTUMVIS_OT_toggle_auto(bpy.types.Operator):
 
         return {'FINISHED'}
 
+
+classes = (FRUSTUMVIS_OT_update,FRUSTUMVIS_OT_toggle_auto,)
+
+def register():
+    for cls in classes:
+        bpy.utils.register_class(cls)
+    bpy.app.handlers.frame_change_post.append(frustum_vis_frame_handler)
+def unregister():
+    for cls in reversed(classes):
+        bpy.utils.unregister_class(cls)
+    bpy.app.handlers.frame_change_post.remove(frustum_vis_frame_handler)

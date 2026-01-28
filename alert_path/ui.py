@@ -1,7 +1,5 @@
 import bpy
-
-from .handlers import run_path_check   # on suppose que tu l'as dans handlers.py
-
+from .ops import run_path_check
 
 # ------------------------------------------------------------------
 # MENU dans la Topbar (contenu du menu)
@@ -55,3 +53,17 @@ def draw_alert_menu(self, context):
         layout.alert = True
         layout.operator("wm.checkpath_fake_menu", icon="ERROR")
         layout.alert = False
+
+classes = (
+    CHECKPATH_MT_menu,
+    CHECKPATH_OT_fake_menu,
+    CHECKPATH_OT_manual_check,
+)
+def register():
+    for c in classes:
+        bpy.utils.register_class(c)
+    bpy.types.TOPBAR_MT_editor_menus.append(draw_alert_menu)
+def unregister():
+    for c in reversed(classes):
+        bpy.utils.unregister_class(c)
+    bpy.types.TOPBAR_MT_editor_menus.remove(draw_alert_menu)

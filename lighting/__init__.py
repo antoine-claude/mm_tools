@@ -1,24 +1,22 @@
 import importlib
-from . import ops, ui, props
+from . import ops, panel
 
 # ---------REGISTER ----------.
 
+
 def reload():
     global ops
-    global ui
+    global panel
 
     ops = importlib.reload(ops)
-    ui = importlib.reload(ui)
-    props = importlib.reload(props)
+    panel = importlib.reload(panel)
 
 
 def register():
     ops.register()
-    ui.register()
-    props.register()
+    panel.register()
 
 
 def unregister():
-    ui.unregister()
+    panel.unregister()
     ops.unregister()
-    props.register()

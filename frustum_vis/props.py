@@ -3,11 +3,10 @@ import bpy
 # --------------------------------------------------------------------
 # Scene properties
 # --------------------------------------------------------------------
+class FRUSTUM_property_group_panel(bpy.types.PropertyGroup):
+    """Group of properties for Frustum Visibility addon"""
 
-def register_frustum_properties():
-    scene = bpy.types.Scene
-
-    scene.frustum_vis_margin = bpy.props.FloatProperty(
+    frustum_vis_margin: bpy.props.FloatProperty(
         name="Frustum Margin",
         default=0.05,
         min=0.0,
@@ -15,25 +14,25 @@ def register_frustum_properties():
         description="Extra margin around camera frame"
     )
 
-    scene.frustum_vis_auto_update = bpy.props.BoolProperty(
+    frustum_vis_auto_update: bpy.props.BoolProperty(
         name="Auto-update",
         default=False,
         description="Visibility auto-update on frame change"
     )
 
-    scene.frustum_vis_only_mesh = bpy.props.BoolProperty(
+    frustum_vis_only_mesh: bpy.props.BoolProperty(
         name="Only Mesh",
         default=True,
         description="Process only Mesh objects"
     )
 
-    scene.frustum_vis_collection = bpy.props.PointerProperty(
+    frustum_vis_collection: bpy.props.PointerProperty(
         name="Restrict Collection",
         type=bpy.types.Collection,
         description="Restrict to this collection (recursive)"
     )
 
-    scene.frustum_vis_frame_step = bpy.props.IntProperty(
+    frustum_vis_frame_step: bpy.props.IntProperty(
         name="Frame Step",
         default=1,
         min=1,
@@ -42,10 +41,15 @@ def register_frustum_properties():
     )
 
 
-def unregister_frustum_properties():
-    scene = bpy.types.Scene
-    del scene.frustum_vis_margin
-    del scene.frustum_vis_auto_update
-    del scene.frustum_vis_only_mesh
-    del scene.frustum_vis_collection
-    del scene.frustum_vis_frame_step
+
+classes = (FRUSTUM_property_group_panel,)
+
+def register():
+    for cls in classes:
+        bpy.utils.register_class(cls)
+    bpy.types.Scene.frustum_vis_props = bpy.props.PointerProperty(type=FRUSTUM_property_group_panel)
+
+def unregister():
+    del bpy.types.Scene.frustum_vis_props
+    for cls in reversed(classes):
+        bpy.utils.unregister_class(cls)

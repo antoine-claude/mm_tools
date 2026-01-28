@@ -223,7 +223,12 @@ class WM_OT_save_mainfile_with_absolute_paths(bpy.types.Operator):
 # Liste des classes exportables
 # -----------------------------------------
 
-classes = [
-    WM_OT_save_mainfile_incremental,
-    WM_OT_save_mainfile_with_absolute_paths,
-]
+classes = (WM_OT_save_mainfile_incremental, WM_OT_save_mainfile_with_absolute_paths,)
+
+def register():
+    for c in classes:
+        bpy.utils.register_class(c)
+    
+def unregister():
+    for c in classes:
+        bpy.utils.unregister_class(c)

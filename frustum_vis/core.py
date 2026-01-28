@@ -14,8 +14,8 @@ def iter_target_objects(scene):
       - objects that instance linked collections (EMPTY with instance_collection)
       - objects inside linked collections (if they are instanced)
     """
-    only_mesh = scene.frustum_vis_only_mesh
-    limit_col = scene.frustum_vis_collection
+    only_mesh = scene.frustum_vis_props.frustum_vis_only_mesh
+    limit_col = scene.frustum_vis_props.frustum_vis_collection
 
     def should_skip(obj):
         # Hide objects in WGT collections
@@ -130,7 +130,7 @@ def update_visibility_from_camera(scene):
         return
 
     depsgraph = bpy.context.evaluated_depsgraph_get()
-    margin = scene.frustum_vis_margin
+    margin = scene.frustum_vis_props.frustum_vis_margin
     xmin, xmax = -margin, 1.0 + margin
     ymin, ymax = -margin, 1.0 + margin
     visible_count = 0

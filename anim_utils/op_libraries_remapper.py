@@ -88,6 +88,12 @@ class OT_RemapPaths(Operator):
         return {'FINISHED'}
 
 # --- Enregistrement ---
-classes = [
-    RemapItem, OT_RemapPaths
-]
+classes = (RemapItem, OT_RemapPaths,)
+
+def register():
+    for c in classes:
+        bpy.utils.register_class(c)
+    
+def unregister():
+    for c in classes:
+        bpy.utils.unregister_class(c)
