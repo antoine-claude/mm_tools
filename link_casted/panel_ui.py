@@ -11,16 +11,41 @@ class VIEW3D_PT_link_casted(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         scene = context.scene
+        link_props = [p for p in dir(scene) if p.startswith("link_")]
 
-        if any(prop.startswith("link_") for prop in dir(scene)):
+        if link_props:
             box = layout.box()
-            for prop in dir(scene):
-                if prop.startswith("link_"):
-                    row = box.row()
-                    row.prop(scene, prop)
 
+            groups = {"CHR": [], "PRP": [], "SET": [], "Camera": []}
+            others = []
 
-        else :
+            for prop in link_props:
+                parts = prop.split("_")
+                if len(parts) > 2:
+                    key = parts[2].upper()
+                    prefix = key[:3]
+                    if prefix in groups:
+                        groups[prefix].append(prop)
+                    else:
+                        others.append(prop)
+                else:
+                    others.append(prop)
+
+            # show uncategorized props first
+            for prop in sorted(others):
+                row = box.row()
+                row.prop(scene, prop)
+
+            # then show categorized props under their label
+            for label in ("CHR", "PRP", "SET", "Camera"):
+                items = groups[label]
+                if items:
+                    box.label(text=label)
+                    for prop in sorted(items):
+                        row = box.row()
+                        row.prop(scene, prop)
+
+        else:
             layout.label(text="Pas d'assets trouvés.")
         layout.operator("linkcasted.load_files", icon="FILE_REFRESH")
         layout.operator("linkcasted.link_asset_to_collection", icon="FILE_REFRESH")

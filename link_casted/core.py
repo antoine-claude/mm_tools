@@ -46,8 +46,8 @@ def match_shot():
             if blend_name.split('_')[3] == f"{int(num):04d}":
                 assets = [p.strip() for p in asset_txt.split('-') if p.strip()]
                 # print(f"yes chef {assets} correspond a blendfile {int(num):04d} au row {i+1}")
-                return assets, num
-
+    assets.append("MM_Camera")
+    return assets, num
 
 
 def find_file(match_shot):
@@ -58,25 +58,47 @@ def find_file(match_shot):
     base_chars = os.path.join(prod_dir, "Assets", "Characters")
     base_props = os.path.join(prod_dir, "Assets", "Props")
     base_sets = os.path.join(prod_dir, "Assets", "Sets")
+    base_cam = os.path.join(prod_dir, "Assets", "Camera")
     base_set_items = os.path.join(prod_dir, "Assets", "Set_Items")
     final_rd_path = "Final\Render"
-    final_lod_path = "Final\Lo"
     for asset in assets:
         if asset.split('_')[1] == 'CHR':
             candidate = os.path.join(base_chars, asset, final_rd_path, f'{asset}.blend')
-            print(candidate)
+            # print(candidate)
         if asset.split('_')[1] == 'PRP':
             candidate = os.path.join(base_props, asset, final_rd_path, f'{asset}.blend')
-            print(os.path.join(base_props, asset, final_rd_path, f'{asset}.blend'))
+            # print(os.path.join(base_props, asset, final_rd_path, f'{asset}.blend'))
         if asset.split('_')[1] == 'ITM':
             candidate = os.path.join(base_set_items, asset, final_rd_path, f'{asset}.blend')
         if asset.split('_')[1] == 'SET':
-            candidate = os.path.join(base_sets, asset, final_lod_path, f'{asset}.blend')
-
+            candidate = os.path.join(base_sets, asset, final_rd_path, f'{asset}.blend')
+            # print("SET",os.path.join(base_sets, asset, final_rd_path, f'{asset}.blend'))
+        if asset.split('_')[1] == 'Camera':
+            candidate = os.path.join(base_cam, f'{asset}.blend')
+            # print("SET",os.path.join(base_cam, asset, final_rd_path, f'{asset}.blend'))
         if os.path.exists(candidate):
             candidates.append(candidate)
+        
             
     return candidates
+
+def find_root_collections(data_from):
+    """
+    Retourne les collections sans parent
+    (équivalent logique d'un top-level scene collection)
+    """
+    parents = set()
+
+    for col in data_from.collections:
+        for child in col.children:
+            parents.add(child)
+
+    root_cols = [
+        col for col in data_from.collections
+        if col not in parents
+    ]
+
+    return root_cols
 
 
 def link_collection_matching_filename(blend_path):
@@ -89,43 +111,66 @@ def link_collection_matching_filename(blend_path):
         return None
 
     expected_name = os.path.splitext(os.path.basename(blend_path))[0]
-
+    is_env = False
     if expected_name.split('_')[1] == 'CHR':
         expected_col = next((c for c in bpy.data.collections if c.name.casefold() == 'chara'.casefold()), None)
         if expected_col is None :
-            chara_col = bpy.data.collections.new("Chara")
-            bpy.context.scene.collection.children.link(chara_col)
-            chara_col.color_tag = 'COLOR_01'
+            expected_col = bpy.data.collections.new("Chara")
+            bpy.context.scene.collection.children.link(expected_col)
+            expected_col.color_tag = 'COLOR_01'
     elif expected_name.split('_')[1] == 'PRP':
         expected_col = next((c for c in bpy.data.collections if c.name.casefold() == 'props'.casefold()), None)
         if expected_col is None :
-            props_col = bpy.data.collections.new("Props")
-            bpy.context.scene.collection.children.link(props_col)
-            props_col.color_tag = 'COLOR_05'
-    elif expected_name.split('_')[1] == 'ITM':
-        expected_col = next((c for c in bpy.data.collections if c.name.casefold() == 'set'.casefold()), None)
-        if expected_col is None :
-            env_col = bpy.data.collections.new("Env")
-            bpy.context.scene.collection.children.link(env_col)
-            env_col.color_tag = 'COLOR_01'
-    else:
+            expected_col = bpy.data.collections.new("Props")
+            bpy.context.scene.collection.children.link(expected_col)
+            expected_col.color_tag = 'COLOR_05'
+    elif expected_name.split('_')[1] == 'SET':
         expected_col = next((c for c in bpy.data.collections if c.name.casefold() == 'env'.casefold()), None)
+        expected_name = os.path.splitext(os.path.basename(blend_path))[0].split("_")[2]
+        is_env = True
+        if expected_col is None :
+            expected_col = bpy.data.collections.new("Env")
+            bpy.context.scene.collection.children.link(expected_col)
+    elif expected_name.split('_')[1] == "Camera" :
+        expected_col = next((c for c in bpy.data.collections if c.name.casefold() == 'cam'.casefold()), None)
+        if expected_col is None :
+            expected_col = bpy.data.collections.new("Cam")
+            expected_col.color_tag = 'COLOR_04'
+            bpy.context.scene.collection.children.link(expected_col)
 
     try:
         with bpy.data.libraries.load(blend_path, link=True, relative=False) as (data_from, data_to):
-            if expected_name not in data_from.collections:
-                print(f"[WARNING] '{expected_name}' absente de {blend_path}")
-                return None
-            
+            if not is_env :
+                print("Link d'un asset")
+                if expected_name not in data_from.collections:
+                    print(f"[WARNING] '{expected_name}' absente de {blend_path}")
+                    return None
+                data_to.collections = [expected_name]
+            else :
+                print("link d'un env")
+                matching_cols = [
+                    col for col in data_from.collections
+                    if col.startswith(expected_name)
+                ]
+                if not matching_cols:
+                    print(f"[WARNING] Aucune collection ne commence par '{expected_name}'")
+                elif len(matching_cols) > 1:
+                    print(f"[WARNING] Plusieurs collections matchent '{expected_name}', prise de la première")
 
-            data_to.collections = [expected_name]
+                data_to.collections = [matching_cols[0]]
+
 
         linked_col = data_to.collections[0]
-        override_col = linked_col.override_hierarchy_create(
-            scene=bpy.context.scene,
-            view_layer=bpy.context.view_layer,
-            do_fully_editable=True
+        if not is_env :
+            override_col = linked_col.override_hierarchy_create(
+                scene=bpy.context.scene,
+                view_layer=bpy.context.view_layer,
+                do_fully_editable=True
+        
         )
+        
+        else :
+            override_col = linked_col
         if expected_col is not None:
             if override_col.name not in expected_col.children:
                 expected_col.children.link(override_col)

@@ -19,13 +19,13 @@ _kitsu_checked = False
 
 def get_kitsu_host():
     """Dynamically get the kitsu_link from preferences."""
-    try:
-        prefs = bpy.context.preferences.addons[ADDON_NAME].preferences
-        print("Kitsu Link:", prefs.kitsu_link)
-        return prefs.kitsu_link
-    except Exception:
-        return "https://kitsu.20stm-prod.be/api"
-        # return "http://localhost:8800/api"
+
+    prefs = bpy.context.preferences.addons[ADDON_NAME].preferences
+        # print("Kitsu Link:", prefs.kitsu_link)
+    if not prefs.kitsu_link.endswith("/api"):
+        prefs.kitsu_link = prefs.kitsu_link+"/api"
+    return prefs.kitsu_link
+
 
 
 def is_logged():

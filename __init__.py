@@ -12,7 +12,7 @@ from . import updater_ui
 bl_info = {
     "name": "MM Tools",
     "author": "Antoine C",
-    "version": (0, 0, 8, 40),
+    "version": (0, 0, 8, 41),
 }
 classes = (
     updater_ui.DemoPreferences,
