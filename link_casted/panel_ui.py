@@ -16,18 +16,23 @@ class VIEW3D_PT_link_casted(bpy.types.Panel):
         if link_props:
             box = layout.box()
 
-            groups = {"CHR": [], "PRP": [], "SET": [], "Camera": []}
+            groups = {"CHR": [], "PRP": [], "SET": [], "CAMERA": []}
             others = []
 
             for prop in link_props:
                 parts = prop.split("_")
                 if len(parts) > 2:
                     key = parts[2].upper()
-                    prefix = key[:3]
+                    print("key",key)
+                    if key == "CAMERA" :
+                        prefix = key[:6]
+                    else :
+                        prefix = key[:3]                   
                     if prefix in groups:
                         groups[prefix].append(prop)
                     else:
                         others.append(prop)
+                        
                 else:
                     others.append(prop)
 
@@ -36,8 +41,8 @@ class VIEW3D_PT_link_casted(bpy.types.Panel):
                 row = box.row()
                 row.prop(scene, prop)
 
-            # then show categorized props under their label
-            for label in ("CHR", "PRP", "SET", "Camera"):
+            #show categorized props under their label
+            for label in ("CHR", "PRP", "SET", "CAMERA"):
                 items = groups[label]
                 if items:
                     box.label(text=label)
