@@ -64,17 +64,20 @@ def find_file(match_shot):
         if asset.split('_')[1] == 'CHR':
             candidate = os.path.join(base_chars, asset, final_rd_path, f'{asset}.blend')
             # print(candidate)
-        if asset.split('_')[1] == 'PRP':
+        elif asset.split('_')[1] == 'PRP':
             candidate = os.path.join(base_props, asset, final_rd_path, f'{asset}.blend')
             # print(os.path.join(base_props, asset, final_rd_path, f'{asset}.blend'))
-        if asset.split('_')[1] == 'ITM':
+        elif asset.split('_')[1] == 'ITM':
             candidate = os.path.join(base_set_items, asset, final_rd_path, f'{asset}.blend')
-        if asset.split('_')[1] == 'SET':
+        elif asset.split('_')[1] == 'SET':
             candidate = os.path.join(base_sets, asset, final_rd_path, f'{asset}.blend')
             # print("SET",os.path.join(base_sets, asset, final_rd_path, f'{asset}.blend'))
-        if asset.split('_')[1] == 'Camera':
+        elif asset.split('_')[1] == 'Camera':
             candidate = os.path.join(base_cam, f'{asset}.blend')
             # print("SET",os.path.join(base_cam, asset, final_rd_path, f'{asset}.blend'))
+        else :
+            candidate = None
+        if not candidate:continue
         if os.path.exists(candidate):
             candidates.append(candidate)
         
@@ -139,27 +142,44 @@ def link_collection_matching_filename(blend_path):
 
     try:
         with bpy.data.libraries.load(blend_path, link=True, relative=False) as (data_from, data_to):
-            if not is_env :
+
+            if not is_env:
                 print("Link d'un asset")
+
                 if expected_name not in data_from.collections:
                     print(f"[WARNING] '{expected_name}' absente de {blend_path}")
                     return None
+
+                # cas simple : on link direct par nom
                 data_to.collections = [expected_name]
-            else :
-                print("link d'un env")
-                matching_cols = [
-                    col for col in data_from.collections
-                    if col.startswith(expected_name)
-                ]
-                if not matching_cols:
-                    print(f"[WARNING] Aucune collection ne commence par '{expected_name}'")
-                elif len(matching_cols) > 1:
-                    print(f"[WARNING] Plusieurs collections matchent '{expected_name}', prise de la première")
 
-                data_to.collections = [matching_cols[0]]
+            else:
+                print("Link d'un env")
 
+                # 1) on charge TOUTES les collections
+                data_to.collections = list(data_from.collections)
 
-        linked_col = data_to.collections[0]
+        # 2) post-traitement APRÈS le with
+        if is_env:
+            loaded_cols = data_to.collections
+            child_names = set()
+
+            for col in loaded_cols:
+                for child in col.children:
+                    child_names.add(child.name)
+
+            root_cols = [col for col in loaded_cols if col.name not in child_names]
+
+            if not root_cols:
+                print("[ERROR] Aucune collection racine trouvée")
+                return None
+
+            linked_col = root_cols[0]
+
+        else:
+            linked_col = data_to.collections[0]
+            
+
         if not is_env :
             override_col = linked_col.override_hierarchy_create(
                 scene=bpy.context.scene,

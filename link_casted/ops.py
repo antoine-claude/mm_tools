@@ -149,8 +149,9 @@ class LINKCASTED_OT_link_sounds(bpy.types.Operator):
             return cleaned_name  
         blend_path = bpy.data.filepath
         ep_dir = find_dir_ep(blend_path)  
+        ep = os.path.basename(ep_dir)
         sound_name = clean_blend_name(blend_path) + ".wav"     
-        sound_path = os.path.join(ep_dir, "EP118_Material", "AUDIO_VIDEO","Single_Shot_Audio_01",sound_name )
+        sound_path = os.path.join(ep_dir, f"EP{ep}_Material", "AUDIO_VIDEO","Single_Shot_Audio_01",sound_name )
 
         blend_name = clean_blend_name(blend_path)  
 

@@ -1,17 +1,9 @@
 {
     "last_check": "2026-02-06 12:44:35.783329",
     "backup_date": "",
-    "update_ready": true,
+    "update_ready": false,
     "ignore": false,
     "just_restored": false,
     "just_updated": false,
-    "version_text": {
-        "link": "https://api.github.com/repos/antoine-claude/mm_tools/zipball/v0.0.8.42",
-        "version": [
-            0,
-            0,
-            8,
-            42
-        ]
-    }
+    "version_text": {}
 }

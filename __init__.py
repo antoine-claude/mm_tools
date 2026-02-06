@@ -13,7 +13,7 @@ importlib.reload(updater_ui)
 bl_info = {
     "name": "MM Tools",
     "author": "Antoine C",
-    "version": (0, 0, 8, 43),
+    "version": (0, 0, 8, 44),
 }
 def register():
     addon_updater_ops.register(bl_info)
