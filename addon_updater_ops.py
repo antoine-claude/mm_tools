@@ -1503,7 +1503,14 @@ def register(bl_info):
         # Apply annotations to remove Blender 2.8+ warnings, no effect on 2.7
         make_annotations(cls)
         # Comment out this line if using bpy.utils.register_module(__name__)
-        bpy.utils.register_class(cls)
+        try:
+            bpy.utils.register_class(cls)
+        except ValueError as e:
+            msg = str(e)
+            if "already registered" in msg or "already registered as a subclass" in msg:
+                print("Addon updater: class '{}' already registered, skipping.".format(getattr(cls, "__name__", str(cls))))
+            else:
+                raise
 
     # Special situation: we just updated the addon, show a popup to tell the
     # user it worked. Could enclosed in try/catch in case other issues arise.

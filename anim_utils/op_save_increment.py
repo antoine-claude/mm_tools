@@ -61,7 +61,7 @@ def save_with_incremental(filepath=None):
         # propagate exception to caller so operator can report and log it
         raise
 
-    print(f"Saved main file bordel de merde: {new_filepath}")
+    print(f"Saved main file : {new_filepath}")
     return new_filepath
 
 def get_log_json_path(filepath):

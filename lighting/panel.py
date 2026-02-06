@@ -2,7 +2,7 @@ import bpy
 from bpy.types import Panel
 
 # -------------------------------------------------------------------
-# MENUS
+# UI PANEL
 # -------------------------------------------------------------------
 
 class VIEW3D_PT_LightingOps(Panel):
@@ -15,19 +15,26 @@ class VIEW3D_PT_LightingOps(Panel):
         col = self.layout.column(align=True)
         col.operator("lighting.duplicate_light_cols", icon='DUPLICATE')
         col.operator("lighting.rename_light_cols", icon='OUTLINER_COLLECTION')
+        col.operator("lighting.set_light_properties", icon="LIGHT")
         col.operator("lighting.setup_light_linking", icon='LIGHT')
         col.separator()
         col.operator("lighting.modify_render_paths", icon='FILE_FOLDER')
-
 
 
 # -------------------------------------------------------------------
 # REGISTER
 # -------------------------------------------------------------------
 
+
+classes = (
+    VIEW3D_PT_LightingOps,
+)
+
 def register():
-    bpy.utils.register_class(VIEW3D_PT_LightingOps)
+    for c in classes:
+        bpy.utils.register_class(c)
 
 
 def unregister():
-    bpy.utils.unregister_class(VIEW3D_PT_LightingOps)
+    for c in reversed(classes):
+        bpy.utils.unregister_class(c)

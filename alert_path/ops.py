@@ -78,5 +78,5 @@ def register():
     ensure_alert_handlers()
 
 def unregister():
-    remove_alert_handlers()
     bpy.utils.unregister_class(CHECKPATH_OT_show_popup)
+    remove_alert_handlers()

@@ -20,6 +20,6 @@ def register():
 
 
 def unregister():
-    ui.unregister()
     ops.unregister()
+    ui.unregister()
     props.unregister()

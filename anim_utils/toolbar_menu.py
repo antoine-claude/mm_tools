@@ -12,7 +12,7 @@ class VIEW3D_MT_MM(bpy.types.Menu):
         layout.operator("view3d.mm_append_previous_frame", icon='PLAY_REVERSE')
         layout.separator()
 
-def custom_file_menu_draw(self, context):
+def custom_file_mm_menu_draw(self, context):
     layout = self.layout
     layout.separator()
     layout.menu("VIEW3D_MT_MM")
@@ -24,8 +24,10 @@ classes = (VIEW3D_MT_MM,)
 def register():
     for c in classes:
         bpy.utils.register_class(c)
-    bpy.types.VIEW3D_MT_editor_menus.append(custom_file_menu_draw)    
+    bpy.types.VIEW3D_MT_editor_menus.append(custom_file_mm_menu_draw)    
+    # TOPBAR draw assignment moved to package `__init__.py` to centralize menu hooks
 def unregister():
     for c in classes:
         bpy.utils.unregister_class(c)
-    bpy.types.VIEW3D_MT_editor_menus.remove(custom_file_menu_draw)
+    bpy.types.VIEW3D_MT_editor_menus.remove(custom_file_mm_menu_draw)
+    # TOPBAR draw cleanup handled by package `__init__.py`

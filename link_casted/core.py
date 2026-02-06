@@ -4,7 +4,6 @@ import bpy
 import os
 
 def find_prod_dir(blend_path):
-    blend_path = bpy.data.filepath
     dirs = blend_path.split(os.sep)
     for i, d in enumerate(dirs):
         if d.isdigit():
@@ -13,7 +12,6 @@ def find_prod_dir(blend_path):
         
 
 def find_dir_ep(blend_path):
-    blend_path = bpy.data.filepath
     dirs = blend_path.split(os.sep)
     for i, d in enumerate(dirs):
         if d.isdigit():
@@ -21,8 +19,9 @@ def find_dir_ep(blend_path):
             return ep_dir
         
 
-def find_xlsx(ep_dir):
-    ep = os.path.basename(find_dir_ep(ep_dir))
+def find_xlsx(blend_path):
+    ep_dir = find_dir_ep(blend_path)
+    ep = os.path.basename(ep_dir)
     xlsx_path = os.path.join(ep_dir,f"EP{ep}_Material" ,"DOCS",f'MM_{ep}_VB_01_shotlist.xlsx')
     # print("xlsx_path",xlsx_path)
     return xlsx_path
@@ -30,7 +29,7 @@ def find_xlsx(ep_dir):
 
 def match_shot():
     blend_path = bpy.data.filepath
-    filename = find_xlsx(find_dir_ep(blend_path))
+    filename = find_xlsx(blend_path)
     workbook = load_workbook(filename=filename, data_only=True)
     
     blend_name = bpy.path.basename(blend_path)
@@ -183,3 +182,7 @@ def link_collection_matching_filename(blend_path):
         print(f"[ERROR] Échec du link '{expected_name}'")
         print(f"        {e}")
         return None
+
+
+
+# def unlink_collection_not_matching_filename()

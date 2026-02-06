@@ -1,13 +1,8 @@
-import re
 import bpy
-
 from bpy.types import Operator
 from bpy.props import BoolProperty
-from .utils import remap_drivers, remove_animation_on_ctrl_objects, clean_chara_name, replace_from_list, remap_parents
 
-# -------------------------------------------------------------------
-# OPERATOR 1 : MODIFY RENDER PATHS (COMPOSITING / ALL SCENES)
-# -------------------------------------------------------------------
+from .utils import clean_chara_name, replace_chara_tokens, remove_animation_on_ctrl_objects, remap_drivers, delete_collection
 
 # -------------------------------------------------------------------
 # OPERATOR : DUPLICATE COLLECTIONS
@@ -29,14 +24,15 @@ class LIGHTING_OT_duplicate_light_cols(Operator):
         base = light_col.children[0]
 
         for c in list(light_col.children)[1:]:
-            bpy.data.collections.remove(c)
+            delete_collection(c)
+
+            # -------- objects --------
 
         chara_col = bpy.data.collections.get("Chara")
         for chara in chara_col.children[1:]:
             dupe_lut = {}
             new_col = bpy.data.collections.new(base.name)
             light_col.children.link(new_col)
-
             def recurse(src, dst):
                 for obj in src.objects:
                     dup = obj.copy()
@@ -50,11 +46,9 @@ class LIGHTING_OT_duplicate_light_cols(Operator):
                     recurse(child, cc)
 
             recurse(base, new_col)
-            remap_drivers(dupe_lut)
             remap_parents(dupe_lut)
-
+            remap_drivers(dupe_lut)
         return {'FINISHED'}
-
 
 # -------------------------------------------------------------------
 # OPERATOR : RENAME COLLECTIONS / OBJECTS
@@ -69,42 +63,115 @@ class LIGHTING_OT_rename_light_cols(Operator):
         chara_col = bpy.data.collections.get("Chara")
         light_col = bpy.data.collections.get("Light_CH")
 
+        if not chara_col or not light_col:
+            self.report({'ERROR'}, "Missing Chara or Light_CH collection")
+            return {'CANCELLED'}
         to_replace = ["xxx", "MM_CHR_CHARA"]
         to_replace += [c.name for c in chara_col.children]
+        print("to replace", to_replace)
 
         for i, col in enumerate(light_col.children):
+            if '_'.join(col.name.split("_")[:3]) not in to_replace :
+                to_replace.append("_".join(col.name.split("_")[:3]))
+            #     print("'_'.join(col.name.split('_')[:3])", '_'.join(col.name.split("_")[:3]))
+            if i >= len(chara_col.children):
+                continue
+            col_obj = []
             chara = chara_col.children[i]
-            cname = clean_chara_name(chara.name)
-#            if not cname in col.name:
-            col.name = replace_from_list(col.name, to_replace, cname)
+            rename = lambda n: replace_chara_tokens(n, to_replace, chara)
 
+            # -------- collections --------
+            print(rename(col.name), "rename(col.name)")
+            col.name = rename(col.name)
             for sub in col.children_recursive:
-                sub.name = replace_from_list(sub.name, to_replace, cname)
+                sub.name = rename(sub.name)
 
+            # -------- objects --------
             for obj in col.all_objects:
-                obj.name = replace_from_list(obj.name, to_replace, cname)
+                obj.name = rename(obj.name)
+                col_obj.append(obj)
                 if obj.data:
-                    obj.data.name = replace_from_list(obj.data.name, to_replace, cname)
-                for constraint in obj.constraints:
-                    constraint.name = replace_from_list(constraint.name, to_replace, cname)
-                    if constraint.type == "LOCKED_TRACK" and obj.name.endswith("RimKicker_Ctrl"):
-                        print("constraint name", constraint.type)
-                        print("chara.name+_Lit_Loc", chara.name+"_Lit_Loc", bpy.data.objects.get(chara.name+"_Lit_Loc") )
-                        constraint.target = bpy.data.objects.get(chara.name+"_Lit_Loc")
-                    elif obj.name.endswith("LightRig_Ctrl"):
-                        constraint.target = bpy.data.objects.get(cname+"_LightRig_Ctrl")
-                    #check constraint target replace from list 
-                    elif obj.name.endswith("RimKicker_Ctrl") and constraint.type != "LOCKED_TRACK":
-                        constraint.target = bpy.data.objects["Render_Cam"]
-                    else :
-                        constraint.target = bpy.data.objects.get(replace_from_list(constraint.target.name, to_replace, cname))
+                    obj.data.name = rename(obj.data.name)
 
-                remove_animation_on_ctrl_objects(col)
+                # --- constraints creation ---
+                if obj.name.endswith("RimKicker_Ctrl"):
+                    if not any(c.type == 'COPY_LOCATION' for c in obj.constraints):
+                        c = obj.constraints.new("COPY_LOCATION")
+                        c.name = chara.name + "_Copy Location"
+
+                    if not any(c.type == 'COPY_ROTATION' for c in obj.constraints):
+                        c = obj.constraints.new("COPY_ROTATION")
+                        c.name = chara.name + "_Copy Rotation"
+
+                    if not any(c.type == 'LOCKED_TRACK' for c in obj.constraints):
+                        c = obj.constraints.new("LOCKED_TRACK")
+                        c.name = chara.name + "_Locked Track"
+
+                elif obj.name.endswith("LightRig_Ctrl"):
+                    if not any(c.type == 'COPY_LOCATION' for c in obj.constraints):
+                        c = obj.constraints.new("COPY_LOCATION")
+                        c.name = chara.name + "_Copy Location"
+
+                # --- constraints setup ---
+                for constraint in obj.constraints:
+                    if constraint.type == "LOCKED_TRACK" and obj.name.endswith("RimKicker_Ctrl"):
+                        constraint.target = bpy.data.objects.get("Render_Cam")
+                        constraint.track_axis = "TRACK_X"
+                        constraint.lock_axis = "LOCK_Z"
+
+                    elif obj.name.endswith("RimKicker_Ctrl"):
+                        constraint.target = bpy.data.objects.get(
+                            f"{chara.name}_LightRig_Ctrl"
+                        )
+
+                        if constraint.type == "COPY_LOCATION":
+                            constraint.use_offset = True
+
+                        elif constraint.type == "COPY_ROTATION":
+                            constraint.use_x = False
+                            constraint.use_y = False
+                            constraint.use_z = True
+                            constraint.mix_mode = "BEFORE"
+
+                    elif obj.name.endswith("LightRig_Ctrl"):
+                        constraint.target = bpy.data.objects.get(
+                            f"{chara.name}_Lit_Loc"
+                        )
+                        obj["Turn Kicker Off/On"] = True
+
+                    elif not constraint.type == "LOCKED_TRACK" and not obj.name.endswith("RimKicker_Ctrl"):                    
+                        constraint.target = bpy.data.objects.get(rename(constraint.target.name))
+                        
+                    constraint.name = rename(constraint.name)
+
+            remove_animation_on_ctrl_objects(col)
 
         return {'FINISHED'}
 
 
+class LIGHTING_OT_light_property_setter(Operator):
+    bl_idname = "lighting.set_light_properties"
+    bl_label = "Set Light Properties"
+    bl_options = {'REGISTER', 'UNDO'}
 
+    def execute(self, context):
+        light_col = bpy.data.collections.get("Light_CH")
+        if not light_col or not light_col.children:
+            self.report({'ERROR'}, "Light_CH missing or empty")
+            return {'CANCELLED'}
+
+        for col in light_col.children:
+            for obj in col.all_objects:
+                if obj.name.endswith("RS_Key_Ctrl"):
+                    bpy.data.objects[obj.name]["Key Bias"] = 0.8726646304130554
+                    bpy.data.objects[obj.name]["Key Color"] = [1.0, 0.6779999732971191, 0.30000001192092896]
+                    bpy.data.objects[obj.name]["Key Intensity"] = 10.0
+                    
+                if obj.name.endswith("LS_Rim_Ctrl"):
+                    bpy.data.objects[obj.name]["Rim Bias"] = 0.3490658402442932
+                    bpy.data.objects[obj.name]["Rim Color"] = [0.7749999761581421, 0.8312501311302185, 1.0]
+                    bpy.data.objects[obj.name]["Rim Intensity"] = 2.0
+        return {'FINISHED'}
 # -------------------------------------------------------------------
 # OPERATOR : LIGHT LINKING RECEIVER
 # -------------------------------------------------------------------
@@ -121,6 +188,7 @@ class LIGHTING_OT_light_linking_receiver(Operator):
         for i, col in enumerate(light_col.children):
             chara = chara_col.children[i]
             cname = clean_chara_name(chara.name)
+
             if not cname in col.name :
                 continue
             for obj in col.all_objects :
@@ -137,6 +205,7 @@ class LIGHTING_OT_light_linking_receiver(Operator):
                                     light_linking_col.children.link(bpy.data.collections[chara.name])
 
         return {'FINISHED'}
+
 
 # -------------------------------------------------------------------
 # OPERATOR : MODIFY RENDER PATHS
@@ -160,25 +229,18 @@ class LIGHTING_OT_modify_render_paths(Operator):
 
         return {'FINISHED'}
 
-
-
-
-# -------------------------------------------------------------------
-# REGISTER
-# -------------------------------------------------------------------
-
-classes = (
-    LIGHTING_OT_duplicate_light_cols,
-    LIGHTING_OT_rename_light_cols,
-    LIGHTING_OT_light_linking_receiver,
-    LIGHTING_OT_modify_render_paths,
-)
+classes = (LIGHTING_OT_duplicate_light_cols,
+           LIGHTING_OT_rename_light_cols,
+           LIGHTING_OT_light_property_setter,
+           LIGHTING_OT_light_linking_receiver,
+           LIGHTING_OT_modify_render_paths,
+           )
 
 def register():
-    for c in classes:
-        bpy.utils.register_class(c)
+    for cls in classes:
+        bpy.utils.register_class(cls)
 
 
 def unregister():
-    for c in reversed(classes):
-        bpy.utils.unregister_class(c)
+    for cls in reversed(classes):
+        bpy.utils.unregister_class(cls)

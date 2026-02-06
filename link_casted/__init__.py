@@ -23,3 +23,11 @@ def register():
 def unregister():
     ops.unregister()
     panel_ui.unregister()
+    # Clean up dynamic Scene properties created by link_casted
+    try:
+        import bpy
+        for prop in list(bpy.types.Scene.bl_rna.properties):
+            if prop.identifier.startswith("link_"):
+                delattr(bpy.types.Scene, prop.identifier)
+    except Exception:
+        pass

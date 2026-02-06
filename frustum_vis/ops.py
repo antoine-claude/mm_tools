@@ -58,8 +58,10 @@ classes = (FRUSTUMVIS_OT_update,FRUSTUMVIS_OT_toggle_auto,)
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
-    bpy.app.handlers.frame_change_post.append(frustum_vis_frame_handler)
+    ensure_frustum_handler()
 def unregister():
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
-    bpy.app.handlers.frame_change_post.remove(frustum_vis_frame_handler)
+    handlers = bpy.app.handlers.frame_change_post
+    if frustum_vis_frame_handler in handlers:
+        handlers.remove(frustum_vis_frame_handler)

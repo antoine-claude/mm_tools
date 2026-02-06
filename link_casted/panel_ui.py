@@ -1,5 +1,6 @@
 # link_casted/panel_ui.py
 import bpy
+from .cache import get_cached
 
 class VIEW3D_PT_link_casted(bpy.types.Panel):
     bl_label = "Link Casted"
@@ -11,42 +12,21 @@ class VIEW3D_PT_link_casted(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         scene = context.scene
-        link_props = [p for p in dir(scene) if p.startswith("link_")]
-
-        if link_props:
+        cached = get_cached()
+        if cached.get("has_props"):
             box = layout.box()
 
-            groups = {"CHR": [], "PRP": [], "SET": [], "CAMERA": []}
-            others = []
-
-            for prop in link_props:
-                parts = prop.split("_")
-                if len(parts) > 2:
-                    key = parts[2].upper()
-                    print("key",key)
-                    if key == "CAMERA" :
-                        prefix = key[:6]
-                    else :
-                        prefix = key[:3]                   
-                    if prefix in groups:
-                        groups[prefix].append(prop)
-                    else:
-                        others.append(prop)
-                        
-                else:
-                    others.append(prop)
-
             # show uncategorized props first
-            for prop in sorted(others):
+            for prop in cached.get("others", []):
                 row = box.row()
                 row.prop(scene, prop)
 
-            #show categorized props under their label
+            # show categorized props under their label
             for label in ("CHR", "PRP", "SET", "CAMERA"):
-                items = groups[label]
+                items = cached.get("groups", {}).get(label, [])
                 if items:
                     box.label(text=label)
-                    for prop in sorted(items):
+                    for prop in items:
                         row = box.row()
                         row.prop(scene, prop)
 
@@ -54,6 +34,8 @@ class VIEW3D_PT_link_casted(bpy.types.Panel):
             layout.label(text="Pas d'assets trouvés.")
         layout.operator("linkcasted.load_files", icon="FILE_REFRESH")
         layout.operator("linkcasted.link_asset_to_collection", icon="FILE_REFRESH")
+        layout.operator("linkcasted.unlink_asset_to_collection", icon="FILE_REFRESH")
+        layout.operator("linkcasted.link_sounds", icon="SOUND")
 
 
 classes = (VIEW3D_PT_link_casted,)
