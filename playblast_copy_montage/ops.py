@@ -28,7 +28,7 @@ class PLAYBLAST_OT_duplicate_ffmpeg(bpy.types.Operator):
 
     def execute(self, context):
         scene = context.scene
-
+        bpy.ops.playblast.remap_output_path()
         source_file = get_playblast_source_file(scene)
         if not source_file:
             self.report({'ERROR'}, "Le playblast n'existe pas encore.")
@@ -40,7 +40,7 @@ class PLAYBLAST_OT_duplicate_ffmpeg(bpy.types.Operator):
 
         dest_file = get_playblast_dest_file(scene)
         dest_dir = os.path.dirname(dest_file)
-        
+
         if dest_file :
             os.makedirs(dest_dir, exist_ok=True)
 
