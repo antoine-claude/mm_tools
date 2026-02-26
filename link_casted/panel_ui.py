@@ -22,7 +22,7 @@ class VIEW3D_PT_link_casted(bpy.types.Panel):
                 row.prop(scene, prop)
 
             # show categorized props under their label
-            for label in ("CHR", "PRP", "SET", "CAMERA"):
+            for label in ("CHR", "PRP", "ITM", "SET", "CAMERA"):
                 items = cached.get("groups", {}).get(label, [])
                 if items:
                     box.label(text=label)

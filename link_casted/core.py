@@ -56,9 +56,9 @@ def find_file(match_shot):
     prod_dir = find_prod_dir(bpy.data.filepath)
     base_chars = os.path.join(prod_dir, "Assets", "Characters")
     base_props = os.path.join(prod_dir, "Assets", "Props")
+    base_itms = os.path.join(prod_dir, "Assets", "SetItems")
     base_sets = os.path.join(prod_dir, "Assets", "Sets")
     base_cam = os.path.join(prod_dir, "Assets", "Camera")
-    base_set_items = os.path.join(prod_dir, "Assets", "Set_Items")
     final_rd_path = "Final\Render"
     for asset in assets:
         if asset.split('_')[1] == 'CHR':
@@ -67,8 +67,11 @@ def find_file(match_shot):
         elif asset.split('_')[1] == 'PRP':
             candidate = os.path.join(base_props, asset, final_rd_path, f'{asset}.blend')
             # print(os.path.join(base_props, asset, final_rd_path, f'{asset}.blend'))
+        # elif asset.split('_')[1] == 'ITM':
+        #     candidate = os.path.join(base_itms, asset, final_rd_path, f'{asset}.blend')
         elif asset.split('_')[1] == 'ITM':
-            candidate = os.path.join(base_set_items, asset, final_rd_path, f'{asset}.blend')
+            candidate = os.path.join(base_itms, asset, final_rd_path, f'{asset}.blend')
+            # print(os.path.join(base_itms, asset, final_rd_path, f'{asset}.blend'))
         elif asset.split('_')[1] == 'SET':
             candidate = os.path.join(base_sets, asset, final_rd_path, f'{asset}.blend')
             # print("SET",os.path.join(base_sets, asset, final_rd_path, f'{asset}.blend'))
@@ -103,16 +106,16 @@ def find_root_collections(data_from):
     return root_cols
 
 
-def link_collection_matching_filename(blend_path):
+def link_collection_matching_filename(candidate_path):
     """
     Link la collection qui a le même nom que le fichier .blend
     """
 
-    if not os.path.exists(blend_path):
-        print(f"[ERROR] .blend introuvable : {blend_path}")
+    if not os.path.exists(candidate_path):
+        print(f"[ERROR] .blend introuvable : {candidate_path}")
         return None
 
-    expected_name = os.path.splitext(os.path.basename(blend_path))[0]
+    expected_name = os.path.splitext(os.path.basename(candidate_path))[0]
     is_env = False
     if expected_name.split('_')[1] == 'CHR':
         expected_col = next((c for c in bpy.data.collections if c.name.casefold() == 'chara'.casefold()), None)
@@ -126,9 +129,15 @@ def link_collection_matching_filename(blend_path):
             expected_col = bpy.data.collections.new("Props")
             bpy.context.scene.collection.children.link(expected_col)
             expected_col.color_tag = 'COLOR_05'
+    elif expected_name.split('_')[1] == 'ITM':
+        expected_col = next((c for c in bpy.data.collections if c.name.casefold() == 'Itm'.casefold()), None)
+        if expected_col is None :
+            expected_col = bpy.data.collections.new("Itm")
+            bpy.context.scene.collection.children.link(expected_col)
+            expected_col.color_tag = 'COLOR_03'
     elif expected_name.split('_')[1] == 'SET':
         expected_col = next((c for c in bpy.data.collections if c.name.casefold() == 'env'.casefold()), None)
-        expected_name = os.path.splitext(os.path.basename(blend_path))[0].split("_")[2]
+        expected_name = os.path.splitext(os.path.basename(candidate_path))[0].split("_")[2]
         is_env = True
         if expected_col is None :
             expected_col = bpy.data.collections.new("Env")
@@ -141,13 +150,13 @@ def link_collection_matching_filename(blend_path):
             bpy.context.scene.collection.children.link(expected_col)
 
     try:
-        with bpy.data.libraries.load(blend_path, link=True, relative=False) as (data_from, data_to):
+        with bpy.data.libraries.load(candidate_path, link=True, relative=False) as (data_from, data_to):
 
             if not is_env:
                 print("Link d'un asset")
 
                 if expected_name not in data_from.collections:
-                    print(f"[WARNING] '{expected_name}' absente de {blend_path}")
+                    print(f"[WARNING] '{expected_name}' absente de {candidate_path}")
                     return None
 
                 # cas simple : on link direct par nom
@@ -195,7 +204,7 @@ def link_collection_matching_filename(blend_path):
                 expected_col.children.link(override_col)
         if override_col in bpy.context.scene.collection.children_recursive:
             bpy.context.scene.collection.children.unlink(override_col)
-        print(f"[OK] {expected_name} linkée depuis {blend_path}")
+        print(f"[OK] {expected_name} linkée depuis {candidate_path}")
         return override_col
 
     except Exception as e:

@@ -4,7 +4,7 @@ import bpy
 CACHE = {
     "has_props": False,
     "others": [],
-    "groups": {"CHR": [], "PRP": [], "SET": [], "CAMERA": []},
+    "groups": {"CHR": [], "PRP": [], "ITM": [], "SET": [], "CAMERA": []},
 }
 
 
@@ -15,7 +15,7 @@ def update_cache(scene: bpy.types.Scene):
     """
     link_props = [p for p in dir(scene) if p.startswith("link_")]
 
-    groups = {"CHR": [], "PRP": [], "SET": [], "CAMERA": []}
+    groups = {"CHR": [], "PRP": [], "ITM": [], "SET": [], "CAMERA": []}
     others = []
 
     for prop in link_props:
