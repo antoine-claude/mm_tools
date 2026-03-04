@@ -39,31 +39,16 @@ class CHECKPATH_OT_manual_check(bpy.types.Operator):
         return {'FINISHED'}
 
 
-# ------------------------------------------------------------------
-# Topbar : ajout du bouton rouge
-# ------------------------------------------------------------------
-def draw_alert_menu(self, context):
-    TARGET_PATH = "R:\\melodyandmomon"
-    filepath = bpy.data.filepath
-    filename = bpy.path.basename(filepath)
-
-    # CONDITION MÉTIER
-    if not filepath.startswith(TARGET_PATH) and filename.startswith("MM_"):
-        layout = self.layout
-        layout.alert = True
-        layout.operator("wm.checkpath_fake_menu", icon="ERROR")
-        layout.alert = False
-
 classes = (
     CHECKPATH_MT_menu,
     CHECKPATH_OT_fake_menu,
     CHECKPATH_OT_manual_check,
 )
+
 def register():
     for c in classes:
         bpy.utils.register_class(c)
-    bpy.types.TOPBAR_MT_editor_menus.append(draw_alert_menu)
+
 def unregister():
     for c in reversed(classes):
         bpy.utils.unregister_class(c)
-    bpy.types.TOPBAR_MT_editor_menus.remove(draw_alert_menu)

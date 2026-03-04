@@ -1,52 +1,67 @@
+"""
+Kitsu addon for mm_tools.
+Provides integration with Kitsu for playblast rendering and task management.
+"""
+
 import bpy
+import importlib
+from . import shot_build, prefs, props, auth, playblast, generic
 
-from . import kitsu_login_topbar
-from . import kitsu_playblast
-
-# ---------- CLASSES ----------
-
-def get_kitsu_classes():
-    classes = []
-    classes.extend(kitsu_login_topbar.get_classes())
-    classes.extend(kitsu_playblast.get_classes())
-    return classes
+# ---------- REGISTRATION ----------
 
 
-# ---------- HANDLERS ----------
+def reload():
+    global auth
+    global playblast
+    global shot_build
+    global prefs
+    global props
+    global generic
 
-def ensure_kitsu_handlers():
-    # timers
-    bpy.app.timers.register(kitsu_login_topbar.initial_kitsu_check, first_interval=0.1)
+    auth = importlib.reload(auth)
+    playblast = importlib.reload(playblast)
+    shot_build = importlib.reload(shot_build)
+    prefs = importlib.reload(prefs)
+    props = importlib.reload(props)
+    generic = importlib.reload(generic)
 
-    # file load handlers
-    for h in kitsu_playblast.get_handlers():
-        if h not in bpy.app.handlers.load_post:
-            bpy.app.handlers.load_post.append(h)
-
-
-def remove_kitsu_handlers():
-    for h in kitsu_playblast.get_handlers():
-        if h in bpy.app.handlers.load_post:
-            bpy.app.handlers.load_post.remove(h)
-
-
-# ---------- UI ----------
-
-def register_kitsu_ui():
-    for draw in kitsu_login_topbar.get_draw_funcs():
-        bpy.types.TOPBAR_MT_editor_menus.append(draw)
-
-
-def unregister_kitsu_ui():
-    for draw in kitsu_login_topbar.get_draw_funcs():
-        bpy.types.TOPBAR_MT_editor_menus.remove(draw)
+def register():
+    """Register all Kitsu components."""
+    props.register()
+    auth.register()
+    generic.register()
+    playblast.register()
+    shot_build.register()
+    prefs.register()
 
 
-# ---------- PROPERTIES ----------
+def unregister():
+    """Unregister all Kitsu components."""
+    auth.unregister()
+    generic.unregister()
+    playblast.unregister()
+    shot_build.unregister()
+    prefs.unregister()
+    props.unregister()
 
-def register_kitsu_properties():
-    kitsu_playblast.register_properties()
+
+# # ---------- CLASSES ----------
+
+# def get_kitsu_classes():
+#     """Get all Kitsu-related classes for registration."""
+#     classes = []
+#     # Classes are registered via register() functions in each module
+#     return classes
 
 
-def unregister_kitsu_properties():
-    kitsu_playblast.unregister_properties()
+# # ---------- PROPERTIES ----------
+
+# def register_kitsu_properties():
+#     """Register Kitsu scene properties."""
+#     playblast.register_properties()
+
+
+# def unregister_kitsu_properties():
+#     """Unregister Kitsu scene properties."""
+#     playblast.unregister_properties()
+
