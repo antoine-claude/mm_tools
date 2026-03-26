@@ -10,110 +10,9 @@ import bpy
 import os
 from bpy.types import Panel
 from pathlib import Path
-from .core import set_shot_filepath, draw_assets_for_shot, get_highest_version_file, draw_linking_options
+from .core import draw_assets_for_shot, draw_linking_options, draw_asset_filter_and_selector, draw_build_shot_section
 from ..context import core as context_core
 from .. import cache, prefs, ui
-
-
-
-
-def _get_new_output_path(context: bpy.types.Context) -> str | None:
-    """Compute and return the output path for the current shot"""
-    return set_shot_filepath(
-        prefs.project_root_dir_get(context),
-        context.scene.kitsu.episode_active_name,
-        context.scene.kitsu.sequence_active_name,
-        context.scene.kitsu.shot_active_name,
-        context.scene.build_shot.type_folder,
-        context.scene.build_shot.anim_sub_folder
-    )
-
-def draw_output_type_layer_selector(context: bpy.types.Context, layout: bpy.types.UILayout) -> None:
-    """Draw output layer selection (type_folder and animation subfolder)"""
-    layout.label(text="Output Task Folder :")
-    row = layout.row(align=True)
-    row.prop(context.scene.build_shot, "type_folder")
-
-def draw_output_animation_subfolder_selector(context: bpy.types.Context, layout: bpy.types.UILayout) -> None:
-    """Draw animation subfolder selector, only if type_folder is set to Animation"""
-    if context.scene.build_shot.type_folder == "Animation":
-        row = layout.row(align=True)
-        row.prop(context.scene.build_shot, "anim_sub_folder")
-
-def draw_asset_filter_and_selector(context: bpy.types.Context, layout: bpy.types.UILayout) -> None:
-    """Draw asset scope selector, filter and asset selection in split row"""
-    # Asset scope selector
-    layout.label(text="Add Asset out of casting : ")
-    box = layout.box()
-    box.prop(context.scene.build_shot, "asset_scope", text="Asset Scope")
-    
-    row = box.row(align=True)
-    row.use_property_split = False
-    
-    # Filter column (0.2 width)
-    split = row.split(factor=0.2, align=True)
-    split.prop(context.scene.build_shot, "asset_filter", text="")
-    
-    # Asset selection column (0.8 width)
-    col = split.column(align=True)
-    col.prop(context.scene.build_shot, "asset_selected", text="")
-    
-    # Add button to add selected asset to buildshot selection
-    row_add = box.row(align=True)
-    row_add.operator(
-        "build_shot.add_asset_to_selection",
-        text="Add to Selection",
-        icon='ADD'
-    )
-    row.separator()
-
-def draw_build_shot_section(context: bpy.types.Context, layout: bpy.types.UILayout) -> None:
-    """Draw build shot output path and build button"""
-    shot_active = cache.shot_active_get()
-    if not shot_active or not shot_active.id:
-        return
-    
-    output_path = _get_new_output_path(context)
-    highest_version = get_highest_version_file(output_path)
-
-    if not highest_version:
-        if not os.path.exists(os.path.dirname(output_path)):
-            row = layout.row(align=True)
-            row.alignment = 'CENTER'
-            print(f"Folder {os.path.dirname(output_path)} does not exist")
-            row.label(text=f"Folder {context.scene.build_shot.type_folder} missing",
-                       icon="ERROR")
-            return
-        layout.label(text=f"Output Path: {output_path}")
-        # Build shot button - conditional based on type_folder
-        if context.scene.build_shot.type_folder == "Animation":
-            layout.operator(
-                "build_shot.build_shot_animation",
-                text="Build Animation Shot",
-                icon='FILE_TICK'
-            )
-        else:
-            layout.operator(
-                "build_shot.build_shot_layout",
-                text="Build Layout Shot",
-                icon='FILE_TICK'
-            )
-    elif highest_version and os.path.exists(highest_version):
-        if bpy.data.filepath == highest_version:
-            layout.label(text=f"Actual File",icon="CHECKMARK")
-        else :
-            #Open existing file button
-            layout.label(text=f"Shot already built: {highest_version}",
-                        icon="CHECKMARK")
-            open_file = layout.operator(
-                "wm.open_mainfile",
-                text="Open Existing Shot",
-                icon='FILE_FOLDER'
-            )
-            open_file.filepath = highest_version
-            open_file.load_ui = False
-            open_file.display_file_selector = False
-
 
 class BUILD_SHOT_PT_main_panel(Panel):
     """Main panel for Shot Builder addon"""
@@ -150,7 +49,7 @@ class BUILD_SHOT_PT_main_panel(Panel):
         # Production header
         row = layout.row()
         row.label(text=f"Production: {project_active.name}")
-        row.operator("build_shot.get_current_context", text="", icon="FILE_REFRESH" )
+        row.operator("kitsu.get_current_context", text="", icon="FILE_REFRESH" )
         
         
         flow = layout.grid_flow(
@@ -162,10 +61,17 @@ class BUILD_SHOT_PT_main_panel(Panel):
         context_core.draw_episode_selector(context, col)
         # Sequence selector
         context_core.draw_sequence_selector(context, col)
-        
         # Shot selector
         context_core.draw_shot_selector(context, col)
+        col.separator()
+        #Department selector
+        context_core.draw_department_selector(context, col)
+        #Task type selector selector
+        context_core.is_task_type_list_for_department(context)
 
+        if context_core.is_department_context(context) :
+            if context_core.is_task_type_list_for_department(context) :
+                context_core.draw_task_type_department_selector(context, col)
         # Asset selection for the shot
         col.separator()
 
@@ -183,14 +89,13 @@ class BUILD_SHOT_PT_main_panel(Panel):
             draw_linking_options(context, box)
         
 
-        layout.use_property_split = True
-        flow = layout.grid_flow(
-        row_major=True, columns=0, even_columns=True, even_rows=False, align=False
-        )
-        col = flow.column()
-        # Output layer selection
-        draw_output_type_layer_selector(context, col)
-        draw_output_animation_subfolder_selector(context, col)
+        # layout.use_property_split = True
+        # flow = layout.grid_flow(
+        # row_major=True, columns=0, even_columns=True, even_rows=False, align=False
+        # )
+        # col = flow.column()
+        # # Output layer selection
+                
 
         # Build shot section
         draw_build_shot_section(context, layout)

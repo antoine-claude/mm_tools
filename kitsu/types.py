@@ -293,6 +293,9 @@ class Project(Entity):
 
     # EPISODES
     # ---------------
+    def get_episode_by_name(self, ep_name: str) -> Optional[Episode]:
+        return Episode.by_name(self, ep_name)
+
     def get_episode(self, ep_id: str) -> Episode:
         return Episode.by_id(ep_id)
 
@@ -587,6 +590,14 @@ class Shot(Entity):
     def get_all_task_types(self) -> List[TaskType]:
         return [TaskType.from_dict(t) for t in gazu.task.all_task_types_for_shot(asdict(self))]
 
+    def get_all_departments(self) -> List[Department]:
+        departments = []
+        for task_type in self.get_all_task_types():
+            department = task_type.get_department()
+            if department and department not in departments:
+                departments.append(department)
+        return departments
+    
     def get_all_tasks(self) -> List[Task]:
         return [Task.from_dict(t) for t in gazu.task.all_tasks_for_shot(asdict(self))]
 
@@ -780,6 +791,12 @@ class TaskType(Entity):
         for key, value in bkglobals.SHOT_TASK_MAPPING.items():
             if value == self.name:
                 return key
+
+    def get_department(self) -> Optional["Department"]:
+        """Get the Department object for this TaskType using department_id"""
+        if not self.department_id:
+            return None
+        return Department.by_id(self.department_id)
 
     def __bool__(self) -> bool:
         return bool(self.id)
@@ -1007,6 +1024,31 @@ class TaskStatus(Entity):
     def __bool__(self) -> bool:
         return bool(self.id)
 
+@dataclass
+class Department(Entity):
+    """Class to get object oriented representation of backend department data structure.
+    Has multiple constructor functions (by_name, by_id, init>by_dict)
+    """
+
+    id: str = ""
+    name: str = ""
+    color: str = ""
+    type: str = ""
+
+    @classmethod
+    def by_name(cls, name: str) -> Optional[Any]:
+        dept_dict = gazu.person.get_department_by_name(name)
+        if dept_dict:
+            return cls.from_dict(dept_dict)
+        return None
+
+    @classmethod
+    def by_id(cls, dept_id: str) -> "Department":
+        dept_dict = gazu.person.get_department(dept_id)
+        return cls.from_dict(dept_dict)
+
+    def __bool__(self) -> bool:
+        return bool(self.id)
 
 @dataclass
 class Comment(BaseDataClass):

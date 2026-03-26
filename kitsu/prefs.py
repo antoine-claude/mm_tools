@@ -200,13 +200,13 @@ class MMToolsPreferences(bpy.types.AddonPreferences):
             box.row().prop(self, "host")
             box.row().prop(self, "email")
             box.row().prop(self, "passwd")
-            box.row().operator(KITSU_OT_session_start.bl_idname, text="Login", icon="PLAY")
+            box.row().operator(KITSU_OT_session_start.bl_idname, text="Log in", icon="PLAY")
         else:
             row = box.row()
             row.prop(self, "host")
             row.enabled = False
             box.row().label(text=f"Logged in: {self.session.email}")
-            box.row().operator(KITSU_OT_session_end.bl_idname, text="Logout", icon="PANEL_CLOSE")
+            box.row().operator(KITSU_OT_session_end.bl_idname, text="Log out", icon="PANEL_CLOSE")
     
        # Project
         box = col.box()
@@ -230,9 +230,9 @@ class MMToolsPreferences(bpy.types.AddonPreferences):
         box.label(text="Asset", icon="ASSET_MANAGER")
         box.row().prop(self, "asset_dir")
 
-        # Previews
-        box = col.box()
-        box.label(text="Previews", icon="RENDER_ANIMATION")
+        # # Previews
+        # box = col.box()
+        # box.label(text="Previews", icon="RENDER_ANIMATION")
         # box.row().prop(self, "shot_playblast_root_dir")
         # box.row().prop(self, "seq_playblast_root_dir")
         # box.row().prop(self, "frames_root_dir")

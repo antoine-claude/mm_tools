@@ -16,9 +16,9 @@
 #
 # ***** END GPL LICENCE BLOCK *****
 #
-# (c) 2021, Blender Foundation - Paul Golter
+# (c) 2021, Blender Foundatifrom typing importfrom typing import Any, List, Union, Dict, Tuple, Optional
 
-from typing import Any, List, Union, Dict, Tuple
+from typing import Any, List, Optional, Union, Dict, Tuple
 
 import bpy
 
@@ -32,6 +32,7 @@ from .types import (
     Shot,
     Asset,
     AssetType,
+    Department,    
     TaskType,
     Task,
     ProjectList,
@@ -53,6 +54,8 @@ _shot_active: Shot = Shot()
 _asset_active: Asset = Asset()
 _edit_active: Edit = Edit()
 _asset_type_active: AssetType = AssetType()
+_department_active: Department = Department()
+_task_type_department_active: TaskType = TaskType()
 _task_type_active: TaskType = TaskType()
 _user_active: User = User()
 _user_all_tasks: List[Task] = []
@@ -67,7 +70,9 @@ _asset_types_enum_list: List[Tuple[str, str, str]] = []
 _asset_enum_list: List[Tuple[str, str, str]] = []
 _projects_enum_list: List[Tuple[str, str, str]] = []
 _task_types_enum_list: List[Tuple[str, str, str]] = []
+_task_types_department_enum_list: List[Tuple[str, str, str]] = []
 _task_types_shots_enum_list: List[Tuple[str, str, str]] = []
+_department_shots_enum_list: List[Tuple[str, str, str]] = []
 _task_statuses_enum_list: List[Tuple[str, str, str]] = []
 _user_all_tasks_enum_list: List[Tuple[str, str, str]] = []
 _all_edits_enum_list: List[Tuple[str, str, str]] = []
@@ -80,6 +85,7 @@ _seq_cache_proj_id: str = ""
 _seq_cache_episode_id: str = ""
 _shot_cache_seq_id: str = ""
 _task_type_cache_shot_id: str = ""
+_department_cache_task_type_id: str = ""
 _asset_cache_asset_type_id: str = ''
 _all_edits_cache_proj_id: str = ""
 
@@ -199,9 +205,6 @@ def shot_active_set_by_id(context: bpy.types.Context, entity_id: str) -> None:
     
     # Update build shot candidates when shot changes
     update_buildshot_candidates_for_active_shot(context)
-    
-    # Update build shot candidates when shot changes
-    update_buildshot_candidates_for_active_shot(context)
 
 
 def shot_active_reset_entity() -> None:
@@ -266,7 +269,33 @@ def asset_type_active_reset(context: bpy.types.Context) -> None:
     context.scene.kitsu.asset_type_active_name = ""
     logger.debug("Reset active asset type")
 
+##department
+def department_active_get() -> Department:
+    global _department_active
 
+    return _department_active
+
+
+def department_active_set_by_id(context: bpy.types.Context, entity_id: str) -> None:
+    global _department_active
+
+    _department_active = Department.by_id(entity_id)
+    context.scene.kitsu.department_active_id = entity_id
+    logger.debug("Set active department to %s", _department_active.name)
+
+
+def department_active_reset_entity() -> None:
+    global _department_active
+    _department_active = Department()
+
+
+def department_active_reset(context: bpy.types.Context) -> None:
+    department_active_reset_entity()
+    context.scene.kitsu.department_active_id = ""
+    context.scene.kitsu.department_active_name = ""
+    logger.debug("Reset active department")
+
+##Task
 def task_type_active_get() -> TaskType:
     global _task_type_active
 
@@ -292,6 +321,34 @@ def task_type_active_reset(context: bpy.types.Context) -> None:
     context.scene.kitsu.task_type_active_name = ""
     logger.debug("Reset active task type")
 
+# Task type department
+def task_type_department_active_get() -> TaskType:
+    global _task_type_department_active
+
+    return _task_type_department_active
+
+
+def task_type_department_active_set_by_id(context: bpy.types.Context, entity_id: str) -> None:
+    global _task_type_department_active
+
+    _task_type_department_active = TaskType.by_id(entity_id)
+    context.scene.kitsu.task_type_department_active_id = entity_id
+    logger.debug("Set active task type to %s", _task_type_department_active.name)
+
+
+def task_type_department_active_reset_entity() -> None:
+    global _task_type_department_active
+    _task_type_department_active = TaskType()
+
+
+def task_type_department_active_reset(context: bpy.types.Context) -> None:
+    task_type_department_active_reset_entity()
+    context.scene.kitsu.task_type_department_active_id = ""
+    context.scene.kitsu.task_type_department_active_name = ""
+    logger.debug("Reset active task type")
+
+
+#Edit     
 
 def edit_active_set_by_id(context: bpy.types.Context, entity_id: str) -> None:
     global _edit_active
@@ -435,7 +492,7 @@ def get_filtered_assets_for_buildshot(context: bpy.types.Context, asset_filter: 
     
     Args:
         context: Blender context
-        asset_filter: Filter type - 'ALL', 'CHR', 'PRP', 'SET', 'ITM'
+        asset_filter: Filter type - 'ALL', 'CHR', 'PRP', 'SET', 'ITM', 'FX'
         asset_scope: Asset scope - 'PROJECT' for all project assets, 'SHOT' for shot-specific assets
         
     Returns:
@@ -480,8 +537,9 @@ def get_filtered_assets_for_buildshot(context: bpy.types.Context, asset_filter: 
     
     if asset_filter == 'ALL':
         for asset in all_assets:
-            asset_type = asset.name.split('_')[1] if len(asset.name.split('_')) > 1 else None
-            if asset_type in ['CHR', 'PRP', 'SET', 'ITM']:
+            parts = asset.name.split('_')
+            asset_type = "FX" if len(parts) > 2 and parts[2].startswith("FX") else (parts[1] if len(parts) > 1 else None)
+            if asset_type in ['CHR', 'PRP', 'SET', 'ITM', 'FX']:
                 _filtered_assets_list.append(asset)
         return _filtered_assets_list
     
@@ -495,6 +553,8 @@ def get_filtered_assets_for_buildshot(context: bpy.types.Context, asset_filter: 
         elif asset_filter == 'SET' and asset_type == 'SET':
             _filtered_assets_list.append(asset)
         elif asset_filter == 'ITM' and asset_type == 'ITM':
+            _filtered_assets_list.append(asset)
+        elif asset_filter == 'FX' and asset_type == 'FX':
             _filtered_assets_list.append(asset)
     
     return _filtered_assets_list
@@ -595,6 +655,35 @@ def _reorder_task_types_by_priority(task_types: List[TaskType]) -> List[TaskType
         key=_get_priority_value
     )
 
+#Reorder department based on task type priority
+def _reorder_departments_by_task_type_priority(departments: List[Department], task_types: List[TaskType]) -> List[Department]:
+    """Sort departments based on the priority of their associated task types.
+    
+    Departments with higher priority task types appear first. Departments without task types or priority appear last.
+    
+    Args:
+        departments: List of Department objects to sort
+        task_types: List of TaskType objects to determine department priorities
+        
+    Returns:
+        List of Department objects sorted by associated task type priority (ascending)
+    """
+    # Create a mapping of department_id to its highest priority value among its task types
+    department_priority_map = {}
+    for dept in departments:
+        dept_task_priorities = [
+            _get_priority_value(tt) for tt in task_types if tt.department_id == dept.id
+        ]
+        if dept_task_priorities:
+            department_priority_map[dept.id] = min(dept_task_priorities)
+        else:
+            department_priority_map[dept.id] = float('inf')  # No task types, sort to end
+
+    # Sort departments based on their mapped priority values
+    return sorted(
+        departments,
+        key=lambda d: department_priority_map.get(d.id, float('inf'))
+    )
 
 def get_task_types_enum_for_current_context(
     self: bpy.types.Operator, context: bpy.types.Context
@@ -691,6 +780,81 @@ def get_shot_task_types_enum_for_shot(  # TODO Rename
     _task_types_shots_enum_list.extend(items)
 
     return _task_types_shots_enum_list
+
+def get_next_task_type_by_priority(
+    task_types: List[TaskType],
+    current_task_type: TaskType,
+) -> Optional[TaskType]:
+
+    if not current_task_type:
+        return None
+
+    sorted_types = sorted(task_types, key=lambda t: t.priority)
+
+    for t in sorted_types:
+        if t.priority > current_task_type.priority:
+            return t
+
+    return None
+
+def get_shot_department_enum_for_shot(
+    self: bpy.types.Operator,
+    context: bpy.types.Context,
+) -> List[Tuple[str, str, str]]:
+
+    global _department_shots_enum_list
+    
+    shot_active = shot_active_get()
+    if not shot_active:
+        return []
+
+    departments = shot_active.get_all_departments()
+    task_types = shot_active.get_all_task_types()
+    sorted_departments = _reorder_departments_by_task_type_priority(departments, task_types)
+    items = [(d.id, d.name, "") for d in sorted_departments]
+
+    _department_shots_enum_list.clear()
+    _department_shots_enum_list.extend(items)
+
+    return _department_shots_enum_list
+
+def get_all_task_types_for_department(
+    department: Department,
+) -> List[TaskType]:
+
+    if not department:
+        return []
+
+    task_types = TaskType.all_shot_task_types()
+
+    return [
+        t for t in task_types
+        if t.department_id == department.id
+        and t.name != department.name
+    ]
+
+def get_task_types_enum_for_active_department(
+    self: bpy.types.Operator,
+    context: bpy.types.Context,
+) -> List[Tuple[str, str, str]]:
+
+    global _task_types_department_enum_list
+
+    department = department_active_get()
+
+    if not department:
+        return []
+
+    task_types = get_all_task_types_for_department(department)
+
+    sorted_task_types = _reorder_task_types_by_priority(task_types)
+
+    items = [(t.id, t.name, "") for t in sorted_task_types]
+
+    _task_types_department_enum_list.clear()
+    _task_types_department_enum_list.extend(items)
+
+    return _task_types_department_enum_list
 
 
 def get_all_edits_enum_for_active_project(
@@ -861,6 +1025,7 @@ def init_cache_variables() -> None:
     global _shot_active
     global _asset_active
     global _asset_type_active
+    global _department_active
     global _task_type_active
     global _cache_initialized
     addon_prefs = _addon_prefs_get(bpy.context)
@@ -879,6 +1044,7 @@ def init_cache_variables() -> None:
     shot_active_id = bpy.context.scene.kitsu.shot_active_id
     asset_active_id = bpy.context.scene.kitsu.asset_active_id
     asset_type_active_id = bpy.context.scene.kitsu.asset_type_active_id
+    department_active_id = bpy.context.scene.kitsu.department_active_id
     task_type_active_id = bpy.context.scene.kitsu.task_type_active_id
 
     _init_cache_entity(project_active_id, Project, "_project_active", "project")
@@ -887,6 +1053,7 @@ def init_cache_variables() -> None:
     _init_cache_entity(asset_type_active_id, AssetType, "_asset_type_active", "asset type")
     _init_cache_entity(shot_active_id, Shot, "_shot_active", "shot")
     _init_cache_entity(asset_active_id, Asset, "_asset_active", "asset")
+    _init_cache_entity(department_active_id, Department, "_department_active", "department")
     _init_cache_entity(task_type_active_id, TaskType, "_task_type_active", "task type")
 
     _cache_initialized = True

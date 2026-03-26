@@ -96,7 +96,8 @@ class BUILD_SHOT_property_group(bpy.types.PropertyGroup):
             ('CHR', "Characters", "Show only character assets"),
             ('PRP', "Props", "Show only prop assets"),
             ('SET', "Sets", "Show only set assets"),
-            ('ITM', "Items", "Show only set item assets"),
+            ('ITM', "Items", "Show only setitem assets"),
+            ('FX', "FX", "Show only FX assets"),
         ],
         default='ALL'
     )

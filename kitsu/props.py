@@ -375,6 +375,86 @@ class KITSU_property_group_scene(bpy.types.PropertyGroup):
     )
 
     ############
+    # Department
+    ############
+    department_active_id: bpy.props.StringProperty(  # type: ignore
+        name="Active Department ID",
+        description="ID that refers to the active department on server",
+        default="",
+    )
+
+    def get_department_via_name(self):
+        return get_safely_string_prop(self, "department_active_name")
+
+    def set_department_via_name(self, input):
+        key = set_kitsu_entity_id_via_enum_name(
+            self=self,
+            input_name=input,
+            items=cache.get_shot_department_enum_for_shot(self, bpy.context),
+            name_prop='department_active_name',
+            id_prop='department_active_id',
+        )
+        if key:
+            cache.department_active_set_by_id(bpy.context, key)
+        else:
+            cache.department_active_reset_entity()
+        return
+
+    def get_department_search_list(self, context, edit_text):
+        return get_enum_item_names(cache.get_shot_department_enum_for_shot(self, bpy.context))
+
+    department_active_name: bpy.props.StringProperty(
+        name="Department",
+        description="Active Department",
+        default="",  # type: ignore
+        get=get_department_via_name,
+        set=set_department_via_name,
+        options=set(),
+        search=get_department_search_list,
+        # search_options={'SORT'},
+    )
+
+    ############
+    # Task Type Department
+    ############
+    task_type_department_active_id: bpy.props.StringProperty(  # type: ignore
+        name="Active Task Type Department ID",
+        description="ID that refers to the active task type for department on server",
+        default="",
+    )
+
+    def get_task_type_department_via_name(self):
+        return get_safely_string_prop(self, "task_type_department_active_name")
+
+    def set_task_type_department_via_name(self, input):
+        key = set_kitsu_entity_id_via_enum_name(
+            self=self,
+            input_name=input,
+            items=cache.get_task_types_enum_for_active_department(self, bpy.context),
+            name_prop='task_type_department_active_name',
+            id_prop='task_type_department_active_id',
+        )
+        if key:
+            cache.task_type_department_active_set_by_id(bpy.context, key)
+        else:
+            cache.task_type_department_active_reset_entity()
+        return
+
+    def get_task_type_department_search_list(self, context, edit_text):
+        return get_enum_item_names(cache.get_task_types_enum_for_active_department(self, bpy.context))
+
+    task_type_department_active_name: bpy.props.StringProperty(
+        name="Task Type Department",
+        description="Active Task Type for Department",
+        default="",  # type: ignore
+        get=get_task_type_department_via_name,
+        set=set_task_type_department_via_name,
+        options=set(),
+        search=get_task_type_department_search_list,
+        # search_options={'SORT'},
+    )
+
+    ############
     # Asset Type
     ############
 

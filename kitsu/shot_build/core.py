@@ -1,6 +1,7 @@
 import bpy
 import os
 from .. import cache, bkglobals, prefs
+from ..context import core as context_core
 
 # Category values are defined in enum props.py KITSU_property_group_scene under category
 def is_edit_context():
@@ -30,7 +31,7 @@ def get_filtered_assets(context, asset_filter='ALL', asset_scope='PROJECT'):
     
     Args:
         context: Blender context
-        asset_filter: Filter type - 'ALL', 'CHR', 'PRP', 'SET', 'ITM'
+        asset_filter: Filter type - 'ALL', 'CHR', 'PRP', 'SET', 'ITM', 'FX'
         asset_scope: Asset scope - 'PROJECT' for all assets, 'SHOT' for shot-specific
         
     Returns:
@@ -77,31 +78,37 @@ def get_audio_path(prod_dir, episode, shot):
     return os.path.join(audio_folder, sound_name)
 
 
-def get_shot_dir(prod_dir, episode, sequence, shot, type_folder, anim_sub_folder=None):
+def get_shot_dir(prod_dir, episode, sequence, shot, department, task_type=None):
     # Default empty string to None for non-Animation folders
-        
-    if not anim_sub_folder or type_folder != 'Animation':
-        anim_sub_folder = ""
+    if not task_type or department != 'Animation':
+        task_type = ""
     
-    return os.path.join(prod_dir, "screening", episode, "Scenes", sequence, shot, type_folder, anim_sub_folder)
+    return os.path.join(prod_dir, "screening", episode, "Scenes", sequence, shot, department, task_type)
 
 
-def set_shot_filepath(prod_dir, episode, sequence, shot, type_folder, anim_sub_folder=None):
+def set_shot_filepath(prod_dir, episode, sequence, shot, department, task_type=None):
     seq = int(sequence or "001")
     sequence_str = f"{seq:03d}"
-    shot_dir = get_shot_dir(prod_dir, episode, sequence_str, shot, type_folder, anim_sub_folder)
-    if type_folder == 'Animation' :
+    shot_dir = get_shot_dir(prod_dir, episode, sequence_str, shot, department, task_type)
+    if department == 'Animation' :
         task = "An"
-    elif type_folder == 'Layout' :
+    elif department == 'Layout' :
         task = "La"
-    filename = f"MM_{episode}_{sequence_str}_{shot}_{task}_v01_x12.blend"
+    else :
+        task = department[:3]
+    if task:
+        filename = f"MM_{episode}_{sequence_str}_{shot}_{task}_v01_x12.blend"
+    else :
+        raise ValueError(f"Unknown type folder: {department}")
     return os.path.join(shot_dir, filename)
 
 
 def get_asset_path(asset_name, asset_dir):
 
+    # parts = asset_name.split('_')
+    # asset_type = "FX" if len(parts) > 2 and parts[2].startswith("FX") else (parts[1] if len(parts) > 1 else None)
     asset_type = asset_name.split('_')[1] if len(asset_name.split('_')) > 1 else None
-    
+
     if asset_type == 'CHR':
         return os.path.join(
             asset_dir, "Characters", asset_name, 
@@ -122,6 +129,11 @@ def get_asset_path(asset_name, asset_dir):
             asset_dir, "Sets", asset_name, 
             "Final", "Render", f"{asset_name}.blend"
         )
+    # elif asset_type == 'FX':
+    #     return os.path.join(
+    #         asset_dir, "SetItems", asset_name, 
+    #         "Final", "Render", f"{asset_name}.blend"
+    #     )
     elif asset_name == "MM_Camera":
         return os.path.join(
             asset_dir, "Camera", f"{asset_name}.blend"
@@ -205,42 +217,48 @@ def link_collection_matching_filename(candidate_path):
         return None
 
     expected_name = os.path.splitext(os.path.basename(candidate_path))[0]
+    print("expected_name : ",expected_name)
+    print("expected_name split: ",expected_name.split('_')[1])
     is_env = False
     if expected_name.split('_')[1] == 'CHR':
         expected_col = next((c for c in bpy.data.collections if c.name.casefold() == 'chara'.casefold()), None)
         if expected_col is None :
             expected_col = bpy.data.collections.new("Chara")
-            bpy.context.scene.collection.children.link(expected_col)
-            expected_col.color_tag = 'COLOR_01'
+        expected_col.color_tag = 'COLOR_01'
     elif expected_name.split('_')[1] == 'PRP':
         expected_col = next((c for c in bpy.data.collections if c.name.casefold() == 'props'.casefold()), None)
         if expected_col is None :
             expected_col = bpy.data.collections.new("Props")
-            bpy.context.scene.collection.children.link(expected_col)
-            expected_col.color_tag = 'COLOR_05'
+        expected_col.color_tag = 'COLOR_05'
     elif expected_name.split('_')[1] == 'SET':
         expected_col = next((c for c in bpy.data.collections if c.name.casefold() == 'env'.casefold()), None)
         expected_name = os.path.splitext(os.path.basename(candidate_path))[0].split("_")[2]
         is_env = True
         if expected_col is None :
             expected_col = bpy.data.collections.new("Env")
-            bpy.context.scene.collection.children.link(expected_col)
-    elif expected_name.split('_')[1] == "ITM" :
+    elif len(expected_name.split('_')) >2 and expected_name.split('_')[2].startswith("FX"):
+    # elif expected_name.split('_')[2].startswith("FX") :
+        expected_col = next((c for c in bpy.data.collections if c.name.casefold() == 'fx'.casefold()), None)
+        if expected_col is None :
+            expected_col = bpy.data.collections.new("FX")
+        expected_col.color_tag = 'COLOR_06'
+    # elif expected_name.split('_')[1] == "ITM" :
+    elif expected_name.split('_')[1] == "ITM" and not expected_name.split('_')[2].startswith("FX") :
         expected_col = next((c for c in bpy.data.collections if c.name.casefold() == 'setitems'.casefold()), None)
         if expected_col is None :
             expected_col = bpy.data.collections.new("SetItems")
-            bpy.context.scene.collection.children.link(expected_col)
-            expected_col.color_tag = 'COLOR_02'
+        expected_col.color_tag = 'COLOR_02'
     elif expected_name.split('_')[1] == "Camera" :
         expected_col = next((c for c in bpy.data.collections if c.name.casefold() == 'cam'.casefold()), None)
         if expected_col is None :
             expected_col = bpy.data.collections.new("Cam")
-            expected_col.color_tag = 'COLOR_04'
-            bpy.context.scene.collection.children.link(expected_col)
+        expected_col.color_tag = 'COLOR_04'
+    #Link collection to scene if not already
+    if not expected_col in list(bpy.context.scene.collection.children) :
+        bpy.context.scene.collection.children.link(expected_col)
 
     try:
         with bpy.data.libraries.load(candidate_path, link=True, relative=False) as (data_from, data_to):
-
             if not is_env:
                 print("Link d'un asset")
 
@@ -337,8 +355,8 @@ def link_selected_assets(context):
                 shot_assets.append(project_assets_by_name[asset_name])
                 print(f"Added {asset_name} to shot assets from project assets")
     
-    print("Assets to link: ", [a.name for a in shot_assets])
     
+    # print("Assets to link: ", [a.name for a in shot_assets])
     # Check if any asset has a buildshot property
     has_buildshot_props = any(hasattr(scene, f"buildshot_{a.name}") for a in shot_assets)
     
@@ -347,7 +365,6 @@ def link_selected_assets(context):
     
     for asset in shot_assets:
         asset_name = asset.name
-        
         # Skip if asset has buildshot property set to False
         if has_buildshot_props:
             prop_name = f"buildshot_{asset_name}"
@@ -356,6 +373,7 @@ def link_selected_assets(context):
         
         # Get and validate asset path
         asset_path = get_asset_path(asset_name, asset_dir)
+        print("asset_path : ", asset_path)
         if asset_path is None:
             failed_assets.append(f"{asset_name} (unknown type)")
             continue
@@ -413,8 +431,19 @@ def draw_assets_for_shot(context: bpy.types.Context, layout: bpy.types.UILayout)
     # Display shot assets organized by type
     if shot_assets:
         box.label(text="Shot Assets : ", icon="PACKAGE")
-        for label in ("CHR", "PRP", "SET", "ITM", "CAMERA"):
-            items = [a for a in shot_assets if f"_{label}_" in a.name or (label == "CAMERA" and a.name == "MM_Camera")]
+        for label in ("CHR", "PRP", "SET", "ITM", "FX", "CAMERA"):
+            # items = [a for a in shot_assets if f"_{label}" in a.name or (label == "CAMERA" and a.name == "MM_Camera")]
+            items = []
+            for a in shot_assets:
+                parts = a.name.split("_")
+                is_fx = len(parts) > 2 and parts[2].startswith("FX")
+
+                if label == "FX" and is_fx:
+                    items.append(a)
+                elif label != "FX" and f"_{label}" in a.name and not is_fx:
+                    items.append(a)
+                elif label == "CAMERA" and a.name == "MM_Camera":
+                    items.append(a)
             if items:
                 box.label(text=f"{label} :")
                 for asset in items:
@@ -429,6 +458,8 @@ def draw_assets_for_shot(context: bpy.types.Context, layout: bpy.types.UILayout)
                         icon = 'HOME'
                     elif label == 'ITM':
                         icon = 'MESH_CUBE'
+                    elif label == 'FX':
+                        icon = 'SHADERFX'
                     else:
                         icon = 'PACKAGE'
                     asset_row = box.row(align=True)
@@ -441,7 +472,8 @@ def draw_assets_for_shot(context: bpy.types.Context, layout: bpy.types.UILayout)
                     
                     # Check if asset file exists
                     asset_path = get_asset_path(asset.name, asset_dir)
-                    if asset_path and not os.path.exists(asset_path):
+                    # print('asset_path ::', asset.name,asset_path)
+                    if not asset_path or not os.path.exists(asset_path):
                         asset_row.label(text="File missing", icon="ERROR")
     
     # Display manually-added assets section
@@ -450,7 +482,8 @@ def draw_assets_for_shot(context: bpy.types.Context, layout: bpy.types.UILayout)
         box.label(text="Added Assets : ", icon="ADD")
         for asset_name in manually_added:
             # Determine asset type and icon
-            asset_type = asset_name.split('_')[1] if len(asset_name.split('_')) > 1 else None
+            parts = asset_name.split('_')
+            asset_type = "FX" if len(parts) > 2 and parts[2].startswith("FX") else (parts[1] if len(parts) > 1 else None)
             if asset_name == "MM_Camera":
                 icon = 'VIEW_CAMERA'
             elif asset_type == 'CHR':
@@ -459,8 +492,10 @@ def draw_assets_for_shot(context: bpy.types.Context, layout: bpy.types.UILayout)
                 icon = 'ASSET_MANAGER'
             elif asset_type == 'SET':
                 icon = 'HOME'
-            elif asset_type == 'ITM':
+            elif label == 'ITM':
                 icon = 'MESH_CUBE'
+            elif label == 'FX':
+                icon = 'SHADERFX'
             else:
                 icon = 'PACKAGE'
             
@@ -586,11 +621,17 @@ def set_scene_settings(context):
     
     # === Metadata ===
     render.metadata_input = 'SCENE'
+    render.use_file_extension = False
     render.use_stamp_date = False
-    render.use_stamp_time = True
-    render.use_stamp_render_time = True
+    render.use_stamp_time = False
+    render.use_stamp_render_time = False
     render.use_stamp_frame = True
-    render.use_stamp_frame_range = True
+    render.use_stamp_frame_range = False
+    render.use_stamp_memory = False
+    render.use_stamp_hostname = False
+    render.use_stamp_camera = False
+    render.use_stamp_scene = False
+    render.use_stamp_marker = False
     render.use_stamp_filename = True
     render.use_stamp_lens = True
     
@@ -626,14 +667,16 @@ def append_previous_frame_from_previous_shot(scene):
     prod_dir = prefs.prod_dir_get(bpy.context)
     episode = cache.episode_active_get()
     sequence = cache.sequence_active_get()
+    department = cache.department_active_get()
+    task_type = cache.task_type_department_active_get()
     
     previous_shot_path = set_shot_filepath(
         prod_dir=prod_dir,
         episode=episode.name,
         sequence=sequence.name,
         shot=previous_shot_name,
-        type_folder=scene.build_shot.selected_task_type,
-        anim_sub_folder=scene.build_shot.anim_sub_folder
+        department=department.name,
+        task_type=task_type.name
     )
     
     # Get the highest version of the previous shot file
@@ -674,3 +717,160 @@ def append_previous_frame_from_previous_shot(scene):
                     print(f"[INFO] No actions found for {asset_name} in previous shot")
         except Exception as e:
             print(f"[ERROR] Failed to load actions for {asset_name}: {e}")
+
+
+def _get_new_output_path(context: bpy.types.Context) -> str | None:
+    """Compute and return the output path for the current shot"""
+    return set_shot_filepath(
+        prefs.project_root_dir_get(context),
+        context.scene.kitsu.episode_active_name,
+        context.scene.kitsu.sequence_active_name,
+        context.scene.kitsu.shot_active_name,
+        context.scene.kitsu.department_active_name,
+        context.scene.kitsu.task_type_department_active_name
+    )
+
+def get_next_task_type(shot, task_type_name):
+    # 1. Get ALL task types of shot
+    task_types = shot.get_all_task_types()
+
+    # tri par priorité
+    task_types_sorted = sorted(task_types, key=lambda t: t.priority)
+
+    # 2. Find current task type
+    current_task_type = next(
+        (t for t in task_types_sorted if t.name == task_type_name),
+        None
+    )
+
+    # fallback : cas /Layout/file.blend
+    if not current_task_type:
+        current_task_type = next(
+            (t for t in task_types_sorted if t.name == task_type_name),
+            None
+        )
+
+    # 3. Get NEXT task type
+    task_type = None
+    if current_task_type:
+        for t in task_types_sorted:
+            if t.priority > current_task_type.priority:
+                task_type = t
+                break
+    return task_type
+
+def get_sorted_task_types_for_shot(shot):
+    task_types = shot.get_all_task_types()
+    return sorted(task_types, key=lambda t: t.priority)
+
+def draw_department_selector(context: bpy.types.Context, layout: bpy.types.UILayout) -> None:
+    """Draw output layer selection (department and animation task_type)"""
+    layout.label(text="Department :")
+    row = layout.row(align=True)
+    row.prop(context.scene.build_shot, "department_active_name")
+
+def draw_output_task_type_department_selector(context: bpy.types.Context, layout: bpy.types.UILayout) -> None:
+    """Draw task type for department selector, only if department is set to Animation"""
+    if context.scene.kitsu.department_active_name == "Animation":
+        row = layout.row(align=True)
+        row.prop(context.scene.kitsu, "task_type_department_active_name")
+
+def draw_asset_filter_and_selector(context: bpy.types.Context, layout: bpy.types.UILayout) -> None:
+    """Draw asset scope selector, filter and asset selection in split row"""
+    # Asset scope selector
+    layout.label(text="Add Asset out of casting : ")
+    box = layout.box()
+    box.prop(context.scene.build_shot, "asset_scope", text="Asset Scope")
+    
+    row = box.row(align=True)
+    row.use_property_split = False
+    
+    # Filter column (0.2 width)
+    split = row.split(factor=0.2, align=True)
+    split.prop(context.scene.build_shot, "asset_filter", text="")
+    
+    # Asset selection column (0.8 width)
+    col = split.column(align=True)
+    col.prop(context.scene.build_shot, "asset_selected", text="")
+    
+    # Add button to add selected asset to buildshot selection
+    row_add = box.row(align=True)
+    row_add.operator(
+        "build_shot.add_asset_to_selection",
+        text="Add to Selection",
+        icon='ADD'
+    )
+    row.separator()
+
+def draw_build_shot_section(context: bpy.types.Context, layout: bpy.types.UILayout) -> None:
+    """Draw build shot output path and build button"""
+    layout.separator()
+    shot_active = cache.shot_active_get()
+    if not shot_active or not shot_active.id:
+        return
+    if not context.scene.kitsu.department_active_name:
+        row = layout.row(align=True)
+        row.alignment = 'CENTER'
+        row.label(text="Select a department", icon="INFO")
+        return
+
+    department = cache.department_active_get()
+
+    # if not department or not department.id:
+    #     print("No active department")
+    # else:
+    task_types = cache.get_all_task_types_for_department(department)
+
+    if task_types is None:
+        row = layout.row(align=True)
+        row.label(text="Select a task Type")
+        return
+            
+    # if not context.scene.kitsu.task_type_department_active_name :
+    #     row = layout.row(align=True)
+    #     row.label(text="Select a task Type")
+    #     return
+    
+    output_path = _get_new_output_path(context)
+    highest_version = get_highest_version_file(output_path)
+    if not highest_version:
+        print('os.path.dirname(output_path) :',os.path.dirname(output_path))
+        if not os.path.exists(os.path.dirname(output_path)):
+            row = layout.row(align=True)
+            row.alignment = 'CENTER'
+            row.label(text=f"Folder {context.scene.kitsu.department_active_name} missing",
+                       icon="ERROR")
+            return
+        # Build shot button - conditional based on type_folder
+        if context.scene.kitsu.department_active_name == "Animation":
+            layout.operator(
+                "build_shot.build_shot_animation",
+                text="Build Animation Shot",
+                icon='FILE_TICK'
+            )
+        else:
+            layout.operator(
+                "build_shot.build_shot_layout",
+                text="Build Layout Shot",
+                icon='FILE_TICK'
+            )
+        layout.label(text=f"{output_path}")
+
+
+    elif highest_version and os.path.exists(highest_version):
+        if bpy.data.filepath == highest_version:
+            layout.label(text=f"Actual File",icon="CHECKMARK")
+        else :
+            #Open existing file button
+            open_file = layout.operator(
+                "wm.open_mainfile",
+                text="Open Existing Shot",
+                icon='FILE_FOLDER'
+            )
+            open_file.filepath = highest_version
+            open_file.load_ui = False
+            open_file.display_file_selector = False
+
+            layout.label(text=f"Shot already built: {highest_version}",
+                        icon="CHECKMARK")
+
