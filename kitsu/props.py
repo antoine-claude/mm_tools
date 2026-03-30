@@ -653,14 +653,14 @@ class KITSU_property_group_scene(bpy.types.PropertyGroup):
         description="Choose to either Render Playblast from current Viewport or use scene's render settings",
         items=[
             (
-                "SCENE",
-                "Scene",
-                "Render using the scene's render settings, playblast will match 'Render Animation's' output exactly",
+                "PLAYBLAST",
+                "Playblast",
+                "Playblast render from the current viewport, with viewport shading settings and viewport overlays; what you see is what you get",
             ),
             (
-                "VIEWPORT",
-                "Viewport",
-                "Render from the current viewport, with viewport shading settings and viewport overlays; what you see is what you get",
+                "RENDER",
+                "Render",
+                "Render using the scene's render settings, playblast will match 'Render Animation's' output exactly",
             ),
             # (
             #     "VIEWPORT_PRESET",

@@ -2,6 +2,7 @@ import bpy
 import os
 from .. import cache, bkglobals, prefs
 from ..context import core as context_core
+from pathlib import Path
 
 # Category values are defined in enum props.py KITSU_property_group_scene under category
 def is_edit_context():
@@ -217,8 +218,6 @@ def link_collection_matching_filename(candidate_path):
         return None
 
     expected_name = os.path.splitext(os.path.basename(candidate_path))[0]
-    print("expected_name : ",expected_name)
-    print("expected_name split: ",expected_name.split('_')[1])
     is_env = False
     if expected_name.split('_')[1] == 'CHR':
         expected_col = next((c for c in bpy.data.collections if c.name.casefold() == 'chara'.casefold()), None)
@@ -270,7 +269,7 @@ def link_collection_matching_filename(candidate_path):
                 data_to.collections = [expected_name]
 
             else:
-                print("Link d'un env")
+                # print("Link d'un env")
 
                 # 1) on charge TOUTES les collections
                 data_to.collections = list(data_from.collections)
@@ -373,7 +372,6 @@ def link_selected_assets(context):
         
         # Get and validate asset path
         asset_path = get_asset_path(asset_name, asset_dir)
-        print("asset_path : ", asset_path)
         if asset_path is None:
             failed_assets.append(f"{asset_name} (unknown type)")
             continue
@@ -594,7 +592,7 @@ def get_highest_version_file(filepath):
 
 def set_scene_settings(context):
     """Set render settings for shot output as shown in render panel"""
-    scene = context.scene
+    scene = bpy.context.scene
     render = scene.render
     
     # === Resolution ===
@@ -638,10 +636,23 @@ def set_scene_settings(context):
     #If asset camera exists set bpy.data.scenes["Scene"].camera to it
     if "MM_Camera" in bpy.data.objects:
         bpy.data.scenes["Scene"].camera = bpy.data.objects["MM_Camera"]
-    
+
     print("[OK] Scene render settings configured")
 
-
+def set_render_filepath(context):
+    """Set render output path for the current shot"""
+    scene = bpy.context.scene
+    episode = cache.episode_active_get()
+    shot = cache.shot_active_get()
+    task_name = scene.copy_output.copy_output_layer
+    output_path = _get_new_output_path(bpy.context)
+    file_name = "_".join(filter(None, ["MM", episode.name, shot.name, task_name,])) + ".mp4"
+    playblast_path = Path(output_path).parent.joinpath("playblast", file_name).as_posix()
+    # print(f"[OK] Render filepath set to: {playblast_path}")
+    if output_path:
+        return playblast_path
+    else:
+        print("[ERROR] Failed to compute render filepath")
 
 # def load actions from previous shot for each CHR and PRP if build_shot true
 def append_previous_frame_from_previous_shot(scene):
@@ -723,11 +734,11 @@ def _get_new_output_path(context: bpy.types.Context) -> str | None:
     """Compute and return the output path for the current shot"""
     return set_shot_filepath(
         prefs.project_root_dir_get(context),
-        context.scene.kitsu.episode_active_name,
-        context.scene.kitsu.sequence_active_name,
-        context.scene.kitsu.shot_active_name,
-        context.scene.kitsu.department_active_name,
-        context.scene.kitsu.task_type_department_active_name
+        cache.episode_active_get().name,
+        cache.sequence_active_get().name,
+        cache.shot_active_get().name,
+        cache.department_active_get().name,
+        cache.task_type_department_active_get().name
     )
 
 def get_next_task_type(shot, task_type_name):
@@ -771,7 +782,7 @@ def draw_department_selector(context: bpy.types.Context, layout: bpy.types.UILay
 
 def draw_output_task_type_department_selector(context: bpy.types.Context, layout: bpy.types.UILayout) -> None:
     """Draw task type for department selector, only if department is set to Animation"""
-    if context.scene.kitsu.department_active_name == "Animation":
+    if cache.department_active_get().name == "Animation":
         row = layout.row(align=True)
         row.prop(context.scene.kitsu, "task_type_department_active_name")
 
@@ -834,7 +845,6 @@ def draw_build_shot_section(context: bpy.types.Context, layout: bpy.types.UILayo
     output_path = _get_new_output_path(context)
     highest_version = get_highest_version_file(output_path)
     if not highest_version:
-        print('os.path.dirname(output_path) :',os.path.dirname(output_path))
         if not os.path.exists(os.path.dirname(output_path)):
             row = layout.row(align=True)
             row.alignment = 'CENTER'

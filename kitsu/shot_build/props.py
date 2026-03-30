@@ -5,7 +5,7 @@ Episode/Shot/Asset selection now comes from Kitsu props via context.scene.kitsu.
 
 import bpy
 from .. import cache
-
+from . import core
 
 def _get_asset_selected_via_name(self):
     """Get the selected asset name"""
@@ -77,6 +77,7 @@ class BUILD_SHOT_property_group(bpy.types.PropertyGroup):
         name="Output Path",
         description="Folder where to save the shot file",
         subtype='DIR_PATH',
+        get= core.set_render_filepath,
         default=""
     )
     

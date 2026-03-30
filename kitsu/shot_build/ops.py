@@ -165,7 +165,7 @@ class BUILD_SHOT_OT_build_shot_layout(Operator):
 
         for i, shot in enumerate(all_shots):
             if shot.name == selected_shot.name and i > 0:
-                print("shot.name == selected_shot",shot.name)
+                # print("shot.name == selected_shot",shot.name)
                 prev_shot = all_shots[i - 1]
                 prev_shot_name = prev_shot.name
                 break
@@ -189,10 +189,10 @@ class BUILD_SHOT_OT_build_shot_layout(Operator):
                 shutil.copy(prev_filepath, filepath)
             else:
                 self.report({'WARNING'}, "Previous file not found, creating empty scene")
-                self._create_empty_scene()
+                self._create_empty_scene(context)
 
         else:
-            self._create_empty_scene()
+            self._create_empty_scene(context)
 
 
         #Set camera
@@ -210,6 +210,11 @@ class BUILD_SHOT_OT_build_shot_layout(Operator):
         set_frames_timeline(context)
         #Set base settings for scene
         set_scene_settings(context)
+
+        # `read_homefile()` can recreate Scene datablocks, so refresh the reference.
+        scene = context.scene
+        scene.render.filepath = scene.build_shot.output_path
+
 
         try:
             bpy.ops.wm.save_as_mainfile(filepath=filepath)
@@ -238,7 +243,7 @@ class BUILD_SHOT_OT_build_shot_layout(Operator):
         if self.confirm_copy :
             layout.prop(self, "previous_shot_task_type", text="")
 
-    def _create_empty_scene(self):
+    def _create_empty_scene(self, context):
 
         bpy.ops.wm.read_homefile(app_template="")
 
@@ -249,7 +254,7 @@ class BUILD_SHOT_OT_build_shot_layout(Operator):
             bpy.data.objects.remove(obj)
 
         try:            
-            result = link_selected_assets(bpy.context)
+            result = link_selected_assets(context)
             success_count = result['success_count']
             if success_count == 0:
                 self.report({'ERROR'}, "Failed to link any assets")
@@ -257,7 +262,23 @@ class BUILD_SHOT_OT_build_shot_layout(Operator):
         except Exception as e:
             self.report({'ERROR'}, f"Failed to link assets: {str(e)}")
             return {'CANCELLED'}      
-              
+
+        # Link sounds
+        try:
+            #Remove sound strips linked from previous shot if exist
+            for sequence in bpy.context.scene.sequence_editor.sequences:
+                if sequence.type == 'SOUND':
+                    bpy.context.scene.sequence_editor.sequences.remove(sequence)
+            import_sound_strip(context)
+            self.report({'INFO'}, "Audio linked successfully")
+        except FileNotFoundError as e:
+            self.report({'ERROR'}, str(e))
+        
+        set_frames_timeline(context)
+        #Set base settings for scene
+        set_scene_settings(context)
+
+
 class BUILD_SHOT_OT_build_shot_animation(Operator):
     """Build and save the current scene as an animation shot file"""
     bl_idname = "build_shot.build_shot_animation"
@@ -317,7 +338,9 @@ class BUILD_SHOT_OT_build_shot_animation(Operator):
             self.report({'ERROR'}, "No previous department/task type found for this shot")
             return {'CANCELLED'}
         
-        source_filepath = get_highest_version_file(set_shot_filepath(prod_dir, selected_ep, selected_sequence, selected_shot, previous_department.name, previous_task_type.name))
+        source_filepath = get_highest_version_file(
+            set_shot_filepath(prod_dir, selected_ep, selected_sequence, selected_shot, previous_department.name, previous_task_type.name)
+            )
         
         if not source_filepath:
             self.report({'ERROR'}, "No source file found for animation build")

@@ -44,6 +44,14 @@ def active_sequence_row(layout: bpy.types.UILayout) -> None:
         row.enabled = False
     return row
 
+def active_department_row(layout: bpy.types.UILayout) -> None:
+    department_active = cache.department_active_get()
+    sequence_active = cache.sequence_active_get()
+    row = active_sequence_row(layout)
+    if sequence_active and not department_active:
+        row.enabled = False
+    return row
+
 def draw_episode_selector(context: bpy.types.Context, layout: bpy.types.UILayout) -> None:
     row = active_project_row(layout)
     row.prop(context.scene.kitsu, "episode_active_name")
@@ -84,6 +92,10 @@ def draw_department_selector(context, layout):
     row.operator("build_shot.prev_task_type", text="", icon="REMOVE")
     row.operator("build_shot.next_task_type", text="", icon="ADD")
 
+def draw_task_type_department_selector(context: bpy.types.Context, layout: bpy.types.UILayout):
+    row = active_department_row(layout)
+    row.prop(context.scene.kitsu, "task_type_department_active_name")
+
 def is_department_context(context: bpy.types.Context) -> bool:
     return bool(context.scene.kitsu.department_active_name)
 
@@ -93,6 +105,3 @@ def is_task_type_list_for_department(context: bpy.types.Context) -> bool:
     task_types_for_department = cache.get_all_task_types_for_department(cache.department_active_get())
     return bool(task_types_for_department)
 
-
-def draw_task_type_department_selector(context: bpy.types.Context, layout: bpy.types.UILayout):
-    layout.prop(context.scene.kitsu, "task_type_department_active_name")

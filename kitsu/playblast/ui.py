@@ -10,9 +10,9 @@ from pathlib import Path
 from .. import prefs, cache, ui
 from ..playblast.ops import (
     KITSU_OT_playblast_create,
+    KITSU_OT_send_playblast,
 )
 from ..generic.ops import KITSU_OT_open_path
-
 
 class KITSU_PT_vi3d_playblast(bpy.types.Panel):
     """
@@ -62,6 +62,12 @@ class KITSU_PT_vi3d_playblast(bpy.types.Panel):
         # Playblast op.
         row = layout.row(align=True)
         row.operator(KITSU_OT_playblast_create.bl_idname, icon="RENDER_ANIMATION")
+
+        # row = layout.row(align=True)
+        row.operator(KITSU_OT_send_playblast.bl_idname, icon="EXPORT")
+
+        row = layout.row(align=True)
+        layout.prop(context.scene.copy_output, "copy_output_layer")
 
         # Playblast path label.
         if Path(context.scene.kitsu.playblast_file).exists():

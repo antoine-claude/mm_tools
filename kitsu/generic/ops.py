@@ -16,6 +16,22 @@ from ..logger import LoggerFactory
 logger = LoggerFactory.getLogger()
 
 
+class KITSU_OT_preferences_addon_show(bpy.types.Operator):
+    bl_idname = "preferences.addon_show"
+    bl_label = "Open Addon Preferences"
+    bl_description = "Open Blender Preferences on the Add-ons section"
+
+    # Keep this property so existing UI calls that set .module continue to work.
+    module: bpy.props.StringProperty(name="Module", default="")  # type: ignore
+
+    def execute(self, context: bpy.types.Context) -> Set[str]:
+        bpy.ops.screen.userpref_show()
+        bpy.context.preferences.active_section = "ADDONS"
+        addon_name = self.module.split(".")[0].split("_")[0] + " " +self.module.split(".")[0].split("_")[1]
+        bpy.data.window_managers["WinMan"].addon_search = addon_name
+        return {"FINISHED"}
+
+
 class KITSU_OT_open_path(bpy.types.Operator):
     bl_idname = "kitsu.open_path"
     bl_label = "Open"
@@ -66,7 +82,7 @@ class KITSU_OT_open_path(bpy.types.Operator):
 
 # ---------REGISTER ----------.
 
-classes = [KITSU_OT_open_path]
+classes = [KITSU_OT_preferences_addon_show, KITSU_OT_open_path]
 
 
 def register():

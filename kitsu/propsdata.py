@@ -111,6 +111,7 @@ def get_playblast_dir(self: Any) -> str:
 
 
 def get_playblast_file(self: Any) -> str:
+    scene = bpy.context.scene
     if not self.playblast_dir:
         return ""
 
@@ -123,7 +124,7 @@ def get_playblast_file(self: Any) -> str:
 
     # 070_0010_A-anim.mp4
 
-    kitsu_props = bpy.context.scene.kitsu
+    kitsu_props = scene.kitsu
     kitsu_props.get("category")
 
     if context_core.is_sequence_context():
@@ -136,12 +137,10 @@ def get_playblast_file(self: Any) -> str:
         entity_name = shot.name
     else:
         entity_name = ''
-    if task_type.name.lower() == "layout":
-        task_name = "LAY"
-    elif task_type.name.lower() == "spline" or task_type.name.lower() == "pas de 2":
-        task_name = "SPL"
-    else:
-        task_name = None
+
+    task_name = scene.copy_output.copy_output_layer
+
+
     file_name = "_".join(filter(None, ["MM", episode.name, shot.name, task_name,])) + ".mp4"
 
     return Path(self.playblast_dir).joinpath(file_name).as_posix()

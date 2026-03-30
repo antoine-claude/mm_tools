@@ -38,7 +38,7 @@ logger = LoggerFactory.getLogger()
 
 class KITSU_OT_playblast_create(bpy.types.Operator):
     bl_idname = "kitsu.playblast_create"
-    bl_label = "Create Playblast"
+    bl_label = "Create Playblast & Send to Kitsu"
     bl_description = (
         "Creates render either from viewport in which operator was triggered"
         "or renderes with the current scene's render settings"
@@ -183,7 +183,7 @@ class KITSU_OT_playblast_create(bpy.types.Operator):
         if self.is_vse(context):
             output_path = playblast_vse(self, context, playblast_file)
         else:
-            if render_mode == "VIEWPORT":
+            if render_mode == "PLAYBLAST":
                 output_path = playblast_with_viewport_settings(
                     self, context, playblast_file
                 )
@@ -191,7 +191,7 @@ class KITSU_OT_playblast_create(bpy.types.Operator):
             #     output_path = playblast_with_viewport_preset_settings(
             #         self, context, playblast_file
             #     )
-            else:  #  render_mode == "SCENE":
+            else:  #  render_mode == "RENDER":
                 output_path = playblast_with_scene_settings(self, context, playblast_file)
 
         context.window_manager.progress_update(1)
@@ -372,6 +372,228 @@ class KITSU_OT_playblast_create(bpy.types.Operator):
             # Get shot.
             return cache.shot_active_get()
 
+#send playblast to kitsu if playblast file already exists
+class KITSU_OT_send_playblast(bpy.types.Operator):
+    bl_idname = "kitsu.send_playblast"
+    bl_label = "Send Existing Playblast"
+    bl_description = (
+        "Uploads an existing playblast file to Kitsu with the specified "
+        "comment and task type"
+    )
+
+    comment: bpy.props.StringProperty(
+        name="Comment",
+        description="Comment that will be appended to this playblast on Kitsu",
+        default="",
+    )
+    task_status: bpy.props.EnumProperty(items=cache.get_all_task_statuses_enum)  # type: ignore
+
+    thumbnail_frame: bpy.props.IntProperty(
+        name="Thumbnail Frame",
+        description="Frame to use as the thumbnail on Kitsu",
+        min=0,
+    )
+    thumbnail_frame_final: bpy.props.IntProperty(name="Thumbnail Frame Final")
+
+    _entity = None
+    _task_status = None
+    _task = None
+    _task_type = None
+
+    @classmethod
+    def poll(cls, context: bpy.types.Context) -> bool:
+        if not prefs.session_auth(context):
+            cls.poll_message_set("Not logged into Kitsu Server, see Add-On Preferences")
+            return False
+
+        playblast_path_str = context.scene.kitsu.playblast_file
+        if not playblast_path_str:
+            cls.poll_message_set("Invalid Playblast File, see Add-On Preferences")
+            return False
+
+        playblast_path = Path(playblast_path_str)
+        if not playblast_path.exists() or not playblast_path.is_file():
+            cls.poll_message_set("Playblast file does not exist")
+            return False
+
+        if context_core.is_sequence_context():
+            if not cache.sequence_active_get():
+                cls.poll_message_set("No Active Sequence set in Kitsu Context UI")
+                return False
+
+        if context_core.is_shot_context():
+            if not cache.shot_active_get():
+                cls.poll_message_set("No Active Shot set in Kitsu Context UI")
+                return False
+
+        if not cache.task_type_active_get():
+            cls.poll_message_set("No Active Task Type set in Kitsu Context UI")
+            return False
+
+        return True
+
+    def _get_kitsu_task(self, context: bpy.types.Context):
+        task_type_name = cache.task_type_active_get().name
+
+        self._task_status = TaskStatus.by_id(self.task_status)
+        self._task_type = TaskType.by_name(task_type_name)
+
+        if not self._task_type:
+            raise RuntimeError("Failed to upload playblast. Task type missing on Kitsu Server")
+
+        self._task = Task.by_name(self._entity, self._task_type)
+        if not self._task:
+            try:
+                self._task = Task.new_task(
+                    self._entity, self._task_type, task_status=self._task_status
+                )
+            except TypeError:
+                raise RuntimeError(
+                    f"Failed to upload playblast. Task type {self._task_type.name} not present in {self._entity.type} {self._entity.name}"
+                )
+
+    def execute(self, context: bpy.types.Context) -> Set[str]:
+        addon_prefs = prefs.addon_prefs_get(context)
+        kitsu_scene_props = context.scene.kitsu
+
+        if not self.task_status:
+            self.report({"ERROR"}, "Failed to send playblast. Missing task status")
+            return {"CANCELLED"}
+
+        playblast_path = Path(kitsu_scene_props.playblast_file)
+        if not playblast_path.exists() or not playblast_path.is_file():
+            self.report(
+                {"ERROR"},
+                f"Failed to send playblast. File not found: {playblast_path.as_posix()}",
+            )
+            return {"CANCELLED"}
+
+        # Playblast file always starts at frame 0, account for this in thumbnail frame selection.
+        self.thumbnail_frame_final = self.thumbnail_frame - context.scene.frame_start
+        if self.thumbnail_frame_final < 0:
+            self.report(
+                {"ERROR"},
+                f"Thumbnail frame '{self.thumbnail_frame}' is outside of frame range",
+            )
+            return {"CANCELLED"}
+
+        self._entity = self._get_active_entity(context)
+        self._get_kitsu_task(context)
+
+        kitsu_scene_props.playblast_task_status_id = self.task_status
+
+        logger.info("-START- Sending Existing Playblast")
+        context.window_manager.progress_begin(0, 2)
+        context.window_manager.progress_update(0)
+
+        try:
+            self._upload_playblast(context, playblast_path)
+        except gazu.exception.NotAllowedException:
+            self.report(
+                {"ERROR"},
+                "Failed to upload playblast. You don't have permission to add comments to this task",
+            )
+            return {"CANCELLED"}
+
+        context.window_manager.progress_update(2)
+        context.window_manager.progress_end()
+
+        self.report({"INFO"}, f"Uploaded playblast for {self._entity.name}")
+        logger.info("-END- Sending Existing Playblast")
+
+        util.ui_redraw()
+
+        if addon_prefs.pb_open_webbrowser:
+            self._open_webbrowser()
+
+        return {"FINISHED"}
+
+    def invoke(self, context, event):
+        self.comment = ""
+
+        prev_task_status_id = context.scene.kitsu.playblast_task_status_id
+
+        if context.scene.frame_current not in range(
+            context.scene.frame_start, context.scene.frame_end
+        ):
+            context.scene.frame_current = context.scene.frame_start
+
+        self.thumbnail_frame = context.scene.frame_current
+
+        valid_ids = [
+            status[0] for status in cache.get_all_task_statuses_enum(self, context)
+        ]
+        if prev_task_status_id in valid_ids:
+            self.task_status = prev_task_status_id
+        else:
+            todo_status = TaskStatus.by_name(bkglobals.PLAYBLAST_DEFAULT_STATUS)
+            if todo_status:
+                self.task_status = todo_status.id
+
+        return context.window_manager.invoke_props_dialog(self, width=500)
+
+    def draw(self, context: bpy.types.Context) -> None:
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+        layout.prop(self, "task_status", text="Status")
+        layout.prop(self, "comment")
+        layout.prop(self, "thumbnail_frame")
+
+    def _upload_playblast(self, context: bpy.types.Context, filepath: Path) -> None:
+        comment_text = self._gen_comment_text(context, self._entity)
+        comment = self._task.add_comment(
+            self._task_status,
+            comment=comment_text,
+        )
+
+        self._task.add_preview_to_comment(
+            comment,
+            filepath.as_posix(),
+            self.thumbnail_frame_final,
+        )
+
+        logger.info(
+            f"Uploaded playblast for shot: {self._entity.name} under: {self._task_type.name}"
+        )
+
+    def _gen_comment_text(self, context: bpy.types.Context, shot: Shot) -> str:
+        header = f"Playblast {shot.name}"
+        if self.comment:
+            return header + f"\n\n{self.comment}"
+        return header
+
+    def _open_webbrowser(self) -> None:
+        addon_prefs = prefs.addon_prefs_get(bpy.context)
+
+        host_url = addon_prefs.host
+        if host_url.endswith("/api"):
+            host_url = host_url[:-4]
+
+        if host_url.endswith("/"):
+            host_url = host_url[:-1]
+
+        if context_core.is_sequence_context() and cache.sequence_active_get():
+            url = (
+                f"{host_url}/productions/{cache.project_active_get().id}/shots"
+                f"?search={cache.sequence_active_get().name}"
+            )
+        else:
+            url = (
+                f"{host_url}/productions/{cache.project_active_get().id}/shots"
+                f"?search={cache.shot_active_get().name}"
+            )
+
+        webbrowser.open(url)
+
+    def _get_active_entity(self, context):
+        if context_core.is_sequence_context():
+            return cache.sequence_active_get()
+        elif context_core.is_asset_context():
+            return cache.asset_active_get()
+        else:
+            return cache.shot_active_get()
+
 
 class KITSU_OT_push_frame_range(bpy.types.Operator):
     bl_idname = "kitsu.push_frame_range"
@@ -534,7 +756,7 @@ def detect_kitsu_context(dummy: Any) -> None:
         return
 
     try:
-        bpy.ops.kitsu.con_detect_context()
+        bpy.ops.kitsu.get_current_context()
     except RuntimeError:
         bpy.context.window_manager.popup_menu(
             draw_kitsu_context_warning,
@@ -597,6 +819,7 @@ def save_pre_handler_clean_overrides(dummy: Any) -> None:
 
 classes = [
     KITSU_OT_playblast_create,
+    KITSU_OT_send_playblast,
     KITSU_OT_pull_frame_range,
     KITSU_OT_push_frame_range,
     KITSU_OT_check_frame_range,

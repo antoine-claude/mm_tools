@@ -4,7 +4,8 @@ import shutil
 import sys
 import subprocess
 from .utils import get_playblast_dest_file, remap_output_path, get_playblast_source_file
-
+#import core in kitsu.shot_build as core
+from ..kitsu.shot_build import core
 
 
 class PLAYBLAST_OT_remap_output_path(bpy.types.Operator):
@@ -13,7 +14,10 @@ class PLAYBLAST_OT_remap_output_path(bpy.types.Operator):
     bl_description = "Change le outputpath par rapport à l'emplacement du fichier et son nom"
     def execute(self, context):
         scene = context.scene
-        remap_path = remap_output_path(scene)
+        render = scene.render
+        playblast_path = core.set_render_filepath(context)
+        render.filepath = playblast_path
+        remap_path = render.filepath
         if not remap_path:
             self.report({'ERROR'}, "[ALERT] le fichier n'est ni dans Layout, Animation_Spline ou Animation_Stopmo, pas de nouveau outputpath")
             return {'CANCELLED'}

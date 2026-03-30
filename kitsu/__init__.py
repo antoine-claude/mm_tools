@@ -3,7 +3,6 @@ Kitsu addon for mm_tools.
 Provides integration with Kitsu for playblast rendering and task management.
 """
 
-import bpy
 import importlib
 from . import shot_build, prefs, props, auth, playblast, generic
 

@@ -56,22 +56,29 @@ class BUILD_SHOT_PT_main_panel(Panel):
             row_major=True, columns=0, even_columns=True, even_rows=False, align=False
         )
         col = flow.column()
+        # Entity context
+        # col.prop(context.scene.kitsu, "category")
+
+        if not prefs.session_auth(context) or not project_active:
+            row.enabled = False
+
         # col.prop(context.scene.kitsu, "category")
         # Episode selector
         context_core.draw_episode_selector(context, col)
-        # Sequence selector
-        context_core.draw_sequence_selector(context, col)
-        # Shot selector
-        context_core.draw_shot_selector(context, col)
-        col.separator()
-        #Department selector
-        context_core.draw_department_selector(context, col)
-        #Task type selector selector
-        context_core.is_task_type_list_for_department(context)
+        if context_core.is_shot_context():
+            # Sequence selector
+            context_core.draw_sequence_selector(context, col)
+            # Shot selector
+            context_core.draw_shot_selector(context, col)
+            col.separator()
+            #Department selector
+            context_core.draw_department_selector(context, col)
+            #Task type selector selector
+            context_core.is_task_type_list_for_department(context)
 
-        if context_core.is_department_context(context) :
-            if context_core.is_task_type_list_for_department(context) :
-                context_core.draw_task_type_department_selector(context, col)
+            if context_core.is_department_context(context) :
+                if context_core.is_task_type_list_for_department(context) :
+                    context_core.draw_task_type_department_selector(context, col)
         # Asset selection for the shot
         col.separator()
 

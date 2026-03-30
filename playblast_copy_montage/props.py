@@ -9,9 +9,8 @@ class COPY_OUTPUT_property_group(bpy.types.PropertyGroup):
         items=[
             ('LAY1', "LAY1", ""),
             ('LAY2', "LAY2", ""),
-            ('SPL1_TK1', "SPL1_TK1", ""),
-            ('SPL1_TK2', "SPL1_TK2", ""),
-            ('SPL2', "SPL2", ""),
+            ('SPL1', "SPL1", ""),
+            ('SPL1', "SPL1", ""),
             ('SPL3', "SPL3", ""),
         ],
         default='LAY1'
