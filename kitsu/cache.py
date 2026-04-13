@@ -89,13 +89,6 @@ _department_cache_task_type_id: str = ""
 _asset_cache_asset_type_id: str = ''
 _all_edits_cache_proj_id: str = ""
 
-# Build Shot filtered assets cache
-_filtered_assets_list: List[Any] = []
-_filtered_assets_cache_proj_id: str = ""
-_filtered_assets_cache_shot_id: str = ""
-_filtered_assets_cache_filter_type: str = ""
-_filtered_assets_cache_scope_type: str = ""
-
 
 def _addon_prefs_get(context: bpy.types.Context) -> bpy.types.AddonPreferences:
     """
@@ -355,12 +348,12 @@ def edit_active_set_by_id(context: bpy.types.Context, entity_id: str) -> None:
 
     _edit_active = Edit.by_id(entity_id)
     context.scene.kitsu.edit_active_id = entity_id
-    logger.debug("Set active edit to %s", _task_type_active.name)
+    logger.debug("Set active edit to %s", _edit_active.name)
 
 
 def edit_active_reset_entity() -> None:
     global _edit_active
-    _edit_active = TaskType()
+    _edit_active = Edit()
 
 
 def edit_active_get() -> Project:
@@ -369,7 +362,7 @@ def edit_active_get() -> Project:
     return _edit_active
 
 
-def task_type_active_reset(context: bpy.types.Context) -> None:
+def edit_active_reset(context: bpy.types.Context) -> None:
     edit_active_reset_entity()
     context.scene.kitsu.edit_active_id = ""
     context.scene.kitsu.edit_active_name = ""
@@ -484,80 +477,34 @@ def get_shots_enum_for_seq(
     return _shot_enum_list
 
 
-def get_filtered_assets_for_buildshot(context: bpy.types.Context, asset_filter: str = 'ALL', asset_scope: str = 'PROJECT') -> List[Any]:
-    """Get filtered assets for build_shot with caching.
+
+
+
+def get_all_assets_enum(context: bpy.types.Context, asset_scope: str = 'PROJECT') -> List[Tuple[str, str, str]]:
+    """Get all assets for a given scope (PROJECT or EPISODE).
     
-    Caches assets by project/shot and filter type to avoid recalculation during UI rendering and search.
-    Can filter by asset type and choose between project-wide or shot-specific assets.
+    Used for validation and filtering when scope matters but asset type doesn't.
     
     Args:
         context: Blender context
-        asset_filter: Filter type - 'ALL', 'CHR', 'PRP', 'SET', 'ITM', 'FX'
-        asset_scope: Asset scope - 'PROJECT' for all project assets, 'SHOT' for shot-specific assets
+        asset_scope: 'PROJECT' or 'EPISODE'
         
     Returns:
-        List of filtered asset objects
+        List of (id, name, description) tuples for all assets in scope
     """
-    global _filtered_assets_list
-    global _filtered_assets_cache_proj_id
-    global _filtered_assets_cache_shot_id
-    global _filtered_assets_cache_filter_type
-    global _filtered_assets_cache_scope_type
-    
     project_active = project_active_get()
-    shot_active = shot_active_get() if asset_scope == 'SHOT' else None
+    episode_active = episode_active_get() if asset_scope == 'EPISODE' else None
     
-    # Determine cache key based on scope
-    scope_id = shot_active.id if asset_scope == 'SHOT' else project_active.id
+    if not project_active or not project_active.id:
+        return []
     
-    # Return cached list if project/shot, filter, and scope haven't changed
-    if (_filtered_assets_cache_proj_id == project_active.id and 
-        _filtered_assets_cache_shot_id == (shot_active.id if asset_scope == 'SHOT' else "") and
-        _filtered_assets_cache_filter_type == asset_filter and
-        _filtered_assets_cache_scope_type == asset_scope):
-        return _filtered_assets_list
-    
-    # Update cache identifiers
-    _filtered_assets_cache_proj_id = project_active.id
-    _filtered_assets_cache_shot_id = shot_active.id if asset_scope == 'SHOT' else ""
-    _filtered_assets_cache_filter_type = asset_filter
-    _filtered_assets_cache_scope_type = asset_scope
-    
-    _filtered_assets_list.clear()
-    
-    # Get assets based on scope
-    if asset_scope == 'SHOT':
-        if not shot_active or not shot_active.id:
-            return _filtered_assets_list
-        all_assets = shot_active.get_all_assets()
+    all_assets = []
+    if asset_scope == 'EPISODE' and episode_active and episode_active.id:
+        all_assets = episode_active.get_all_assets()
     else:  # PROJECT
-        if not project_active or not project_active.id:
-            return _filtered_assets_list
         all_assets = project_active.get_all_assets()
     
-    if asset_filter == 'ALL':
-        for asset in all_assets:
-            parts = asset.name.split('_')
-            asset_type = "FX" if len(parts) > 2 and parts[2].startswith("FX") else (parts[1] if len(parts) > 1 else None)
-            if asset_type in ['CHR', 'PRP', 'SET', 'ITM', 'FX']:
-                _filtered_assets_list.append(asset)
-        return _filtered_assets_list
-    
-    # Filter by asset type
-    for asset in all_assets:
-        asset_type = asset.name.split('_')[1] if len(asset.name.split('_')) > 1 else None
-        if asset_filter == 'CHR' and asset_type == 'CHR':
-            _filtered_assets_list.append(asset)
-        elif asset_filter == 'PRP' and asset_type == 'PRP':
-            _filtered_assets_list.append(asset)
-        elif asset_filter == 'SET' and asset_type == 'SET':
-            _filtered_assets_list.append(asset)
-        elif asset_filter == 'ITM' and asset_type == 'ITM':
-            _filtered_assets_list.append(asset)
-        elif asset_filter == 'FX' and asset_type == 'FX':
-            _filtered_assets_list.append(asset)
-    
-    return _filtered_assets_list
+    return [(a.id, a.name, a.description or "") for a in all_assets]
 
 
 def get_assetypes_enum_list(
@@ -585,14 +532,27 @@ def get_assetypes_enum_list(
 
 
 def get_assets_enum_for_active_asset_type(
-    self: bpy.types.Operator, context: bpy.types.Context
+    self: bpy.types.Operator, context: bpy.types.Context, asset_scope: str = None
 ) -> List[Tuple[str, str, str]]:
+    """Get assets for active asset type, optionally scoped by build_shot settings.
+    
+    Args:
+        self: Operator or PropertyGroup
+        context: Blender context
+        asset_scope: Optional scope override - 'PROJECT' or 'EPISODE'. 
+                    If None, uses episode_active as default.
+                    If 'PROJECT', forces project-wide assets.
+                    If 'EPISODE', forces episode-specific assets.
+    
+    Returns:
+        List of (id, name, description) tuples for enum items
+    """
     global _asset_enum_list
     global _asset_cache_asset_type_id
 
     project_active = project_active_get()
     asset_type_active = asset_type_active_get()
-    episode_active = episode_active_get()
+    episode_active = episode_active_get() if asset_scope != 'PROJECT' else None
 
     if not project_active or not asset_type_active:
         return []
@@ -893,7 +853,7 @@ def get_all_task_statuses_enum(
     # Update Cache project ID
     _all_task_type_cache_proj_id = project_active.id
 
-    items = [(t.id, t.name, "") for t in TaskStatus.all_task_statuses()]
+    items = [(t.id, t.short_name, "") for t in TaskStatus.all_task_statuses()]
 
     _task_statuses_enum_list.clear()
     _task_statuses_enum_list.extend(items)
@@ -1108,13 +1068,31 @@ def load_post_handler_init_startup_variables(dummy: Any) -> None:
 
 
 def clear_buildshot_properties() -> None:
-    """Remove dynamic BoolProperties created for build_shot assets."""
-    for prop in list(dir(bpy.types.Scene)):
-        if prop.startswith("buildshot_"):
-            try:
-                delattr(bpy.types.Scene, prop)
-            except Exception:
-                pass
+    """Remove dynamic BoolProperties created for build_shot assets.
+
+    Build shot selection properties are stored on the Kitsu scene property group.
+    We also clear legacy Scene-level properties for backward compatibility.
+    """
+    owners = []
+
+    # Preferred owner: Kitsu scene property group type.
+    try:
+        scene = bpy.context.scene
+        if scene and hasattr(scene, "kitsu"):
+            owners.append(type(scene.kitsu))
+    except Exception:
+        pass
+
+    # Legacy owner: Scene type (older implementation).
+    owners.append(bpy.types.Scene)
+
+    for owner in owners:
+        for prop in list(dir(owner)):
+            if prop.startswith("buildshot_"):
+                try:
+                    delattr(owner, prop)
+                except Exception:
+                    pass
 
 
 def update_buildshot_candidates_for_active_shot(context: bpy.types.Context) -> None:
@@ -1148,11 +1126,12 @@ def update_buildshot_candidates_for_active_shot(context: bpy.types.Context) -> N
         return
 
     # Create dynamic BoolProperties for each asset and store candidate names
+    kitsu_scene_type = type(kitsu_scene)
     for asset in assets:
         # Create dynamic BoolProperty for asset selection
         prop_name = f"buildshot_{asset.name}"
         setattr(
-            bpy.types.Scene,
+            kitsu_scene_type,
             prop_name,
             bpy.props.BoolProperty(
                 name=asset.name,

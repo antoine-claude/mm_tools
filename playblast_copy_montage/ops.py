@@ -5,7 +5,7 @@ import sys
 import subprocess
 from .utils import get_playblast_dest_file, remap_output_path, get_playblast_source_file
 #import core in kitsu.shot_build as core
-from ..kitsu.shot_build import core
+from ..kitsu.build_shot import core
 
 
 class PLAYBLAST_OT_remap_output_path(bpy.types.Operator):

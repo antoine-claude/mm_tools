@@ -189,3 +189,4 @@ def reset_all_kitsu_props(self: Any, context: bpy.types.Context) -> None:
     cache.asset_active_reset(context)
     cache.episode_active_reset(context)
     cache.task_type_active_reset(context)
+    cache.department_active_reset(context)

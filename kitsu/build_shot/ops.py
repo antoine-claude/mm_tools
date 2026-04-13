@@ -8,7 +8,7 @@ import bpy
 import os
 from bpy.types import Operator
 from .. import cache, prefs
-from .core import import_sound_strip, get_shot_dir, set_shot_filepath, link_selected_assets, get_highest_version_file, get_audio_path, set_scene_settings, set_frames_timeline, get_sorted_task_types_for_shot
+from .core import import_sound_strip, import_image_ref, init_modeling_scene_setup, init_rigging_scene_setup, set_shot_filepath, link_selected_assets, get_highest_version_file, get_audio_path, set_scene_settings, set_frames_timeline, get_sorted_task_types_for_shot
 from ..types import (
     Shot,
     Department,
@@ -20,7 +20,7 @@ from ..types import (
 
 class BUILD_SHOT_OT_link_selected_assets(Operator):
     """Link all assets for the selected shot"""
-    bl_idname = "build_shot.link_selected_assets"
+    bl_idname = "kitsu.link_selected_assets"
     bl_label = "Link Selected Assets"
     bl_description = "Link all selected assets from the selected shot"
     bl_options = {'REGISTER', 'UNDO'}
@@ -55,16 +55,16 @@ class BUILD_SHOT_OT_link_selected_assets(Operator):
             self.report({'ERROR'}, f"Error linking assets: {str(e)}")
             return {'CANCELLED'}
 
-
 class BUILD_SHOT_OT_add_asset_to_selection(Operator):
     """Add the selected asset to buildshot selection"""
-    bl_idname = "build_shot.add_asset_to_selection"
+    bl_idname = "kitsu.add_asset_to_selection"
     bl_label = "Add Asset to Selection"
     bl_description = "Add the selected asset to the buildshot selection list"
     bl_options = {'REGISTER', 'UNDO'}
     
     def execute(self, context):
         scene = context.scene
+        kitsu_scene = scene.kitsu
         asset_selected = scene.build_shot.asset_selected
         
         if not asset_selected:
@@ -73,18 +73,17 @@ class BUILD_SHOT_OT_add_asset_to_selection(Operator):
         
         # Create a dynamic BoolProperty for this asset
         prop_name = f"buildshot_{asset_selected}"
+        kitsu_scene_type = type(kitsu_scene)
         
         # Check if property already exists
-        if hasattr(scene, prop_name):
-            setattr(scene, prop_name, True)
+        if hasattr(kitsu_scene, prop_name):
+            setattr(kitsu_scene, prop_name, True)
             self.report({'INFO'}, f"Asset '{asset_selected}' already in selection (enabled)")
         else:
             try:
-                # Create the dynamic property on the scene
-                bpy.types.Scene.buildshot_temp = bpy.props.BoolProperty(default=True)
-                setattr(bpy.types.Scene, prop_name, bpy.props.BoolProperty(default=True))
-                setattr(scene, prop_name, True)
-                delattr(bpy.types.Scene, "buildshot_temp")
+                # Create the dynamic property on the Kitsu scene property group.
+                setattr(kitsu_scene_type, prop_name, bpy.props.BoolProperty(default=True))
+                setattr(kitsu_scene, prop_name, True)
                 self.report({'INFO'}, f"Asset '{asset_selected}' added to selection")
             except Exception as e:
                 self.report({'ERROR'}, f"Failed to add asset: {str(e)}")
@@ -97,7 +96,7 @@ class BUILD_SHOT_OT_add_asset_to_selection(Operator):
 
 class BUILD_SHOT_OT_link_audio(Operator):
     """Link the audio file for the selected shot"""
-    bl_idname = "build_shot.link_audio"
+    bl_idname = "kitsu.link_audio"
     bl_label = "Link Audio"
     bl_description = "Link the audio file for the selected shot"
     bl_options = {'REGISTER', 'UNDO'}
@@ -115,10 +114,54 @@ class BUILD_SHOT_OT_link_audio(Operator):
             self.report({'ERROR'}, f"Error linking audio: {str(e)}")
             return {'CANCELLED'}
 
+class BUILD_SHOT_OT_link_image_ref(Operator):
+    """Link the image reference for the selected shot"""
+    bl_idname = "kitsu.link_image_ref"
+    bl_label = "Link Image Reference"
+    bl_description = "Link the image reference for the selected shot"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    def execute(self, context):
+        scene = context.scene
+        try:
+            import_image_ref(context)
+            self.report({'INFO'}, "Image reference linked successfully")
+            return {'FINISHED'}
+        except FileNotFoundError as e:
+            self.report({'ERROR'}, str(e))
+            return {'CANCELLED'}
+        except Exception as e:
+            self.report({'ERROR'}, f"Error linking image reference: {str(e)}")
+            return {'CANCELLED'}
+
+class BUILD_SHOT_OT_remove_link_image_ref(Operator):
+    """Remove the image reference for the selected shot"""
+    bl_idname = "kitsu.remove_link_image_ref"
+    bl_label = "Remove Image Reference"
+    bl_description = "Remove the image reference for the selected shot"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    def execute(self, context):
+        scene = context.scene
+        #If an image is in background camera, remove it
+        try :
+            if scene.camera and scene.camera.data.background_images:
+                for img in scene.camera.data.background_images :
+                    if img.image :
+                        bpy.data.images.remove(img.image)
+                        #remove background image slot
+                        scene.camera.data.background_images.remove(img)
+                self.report({'INFO'}, "Image reference removed successfully")
+            else:
+                self.report({'WARNING'}, "No image reference found to remove")
+            return {'FINISHED'}
+        except Exception as e:
+            self.report({'ERROR'}, f"Error removing image reference: {str(e)}")
+            return {'CANCELLED'}
 
 class BUILD_SHOT_OT_build_shot_layout(Operator):
     """Buld and save the current scene as a shot file"""
-    bl_idname = "build_shot.build_shot_layout"
+    bl_idname = "kitsu.build_shot_layout"
     bl_label = "Build Shot Layout"
     bl_description = "Save the current scene with the selected shot name"
     bl_options = {'REGISTER'}
@@ -206,7 +249,7 @@ class BUILD_SHOT_OT_build_shot_layout(Operator):
             self.report({'INFO'}, "Audio linked successfully")
         except FileNotFoundError as e:
             self.report({'ERROR'}, str(e))
-        
+        import_image_ref(context)
         set_frames_timeline(context)
         #Set base settings for scene
         set_scene_settings(context)
@@ -278,10 +321,9 @@ class BUILD_SHOT_OT_build_shot_layout(Operator):
         #Set base settings for scene
         set_scene_settings(context)
 
-
 class BUILD_SHOT_OT_build_shot_animation(Operator):
     """Build and save the current scene as an animation shot file"""
-    bl_idname = "build_shot.build_shot_animation"
+    bl_idname = "kitsu.build_shot_animation"
     bl_label = "Build Shot Animation"
     bl_description = "Save the current scene with the selected shot name"
     bl_options = {'REGISTER'}
@@ -354,7 +396,6 @@ class BUILD_SHOT_OT_build_shot_animation(Operator):
         except Exception as e:
             self.report({'ERROR'}, f"Failed to build animation shot: {str(e)}")
 
-#Operator for set kitsu.shot_active_name to the current shot name and save the file
 class BUILD_SHOT_OT_get_current_context(Operator):
     """Get the current context from filepath and set active episode/sequence/shot in Kitsu props"""
     bl_idname = "kitsu.get_current_context"
@@ -440,7 +481,7 @@ class BUILD_SHOT_OT_get_current_context(Operator):
             return {'CANCELLED'}
 
 class BUILD_SHOT_OT_prev_shot(Operator):
-    bl_idname = "build_shot.prev_shot"
+    bl_idname = "kitsu.prev_shot"
     bl_label = "Previous Shot"
 
     def execute(self, context):
@@ -464,7 +505,7 @@ class BUILD_SHOT_OT_prev_shot(Operator):
         return {'CANCELLED'}  
 
 class BUILD_SHOT_OT_next_shot(Operator):
-    bl_idname = "build_shot.next_shot"
+    bl_idname = "kitsu.next_shot"
     bl_label = "Next Shot"
 
     def execute(self, context):
@@ -488,7 +529,7 @@ class BUILD_SHOT_OT_next_shot(Operator):
         return {'CANCELLED'}
 
 class BUILD_SHOT_OT_prev_task_type(Operator):
-    bl_idname = "build_shot.prev_task_type"
+    bl_idname = "kitsu.prev_task_type"
     bl_label = "Previous Task Type"
 
     def execute(self, context):
@@ -521,7 +562,7 @@ class BUILD_SHOT_OT_prev_task_type(Operator):
         cache.task_type_department_active_set_by_id(context, task_type.id)
 
 class BUILD_SHOT_OT_next_task_type(Operator):
-    bl_idname = "build_shot.next_task_type"
+    bl_idname = "kitsu.next_task_type"
     bl_label = "Next Task Type"
 
     def execute(self, context):
@@ -554,12 +595,57 @@ class BUILD_SHOT_OT_next_task_type(Operator):
         cache.task_type_department_active_set_by_id(context, task_type.id)
 
 
+"""
+Operator Build Assets Task type(Model, Shading, Rigging)
+"""
+
+class BUILD_ASSETS_OT_build(Operator):
+    bl_idname = "kitsu.build_assets"
+    bl_label = "Build Assets"
+
+    def execute(self, context):
+        #Initialize scene for asset
+        asset_active = cache.asset_active_get()
+        task_type_active = cache.task_type_active_get()
+        #check if asset not already build in folder
+        asset_dir = prefs.asset_dir_get(context)
+        asset_folder_path = os.path.join(asset_dir, asset_active.name, task_type_active.name)
+        asset_file_name = f"{asset_active.name}_{task_type_active.short_name}.blend"
+        asset_file_path = os.path.join(asset_folder_path, asset_file_name)
+        if os.path.exists(asset_file_path):
+            self.report({'ERROR'}, f"Asset file already exists: {asset_file_path}")
+            return {'CANCELLED'}
+        #Create file from general new file
+        bpy.ops.wm.read_homefile(app_template="")
+        #Clean scene
+        for collection in list(bpy.data.collections):
+            bpy.data.collections.remove(collection)
+        for obj in list(bpy.data.objects):
+            bpy.data.objects.remove(obj)
+        
+        #Create collection
+        asset_task_type_collection_name = f"{asset_active.name}_{task_type_active.name}"
+        #check if collection already exist in scene
+        if not asset_active.name in bpy.data.collections:
+            asset_collection = bpy.data.collections.new(asset_active.name)
+        else :
+            asset_collection = bpy.data.collections[asset_active.name]
+        asset_task_type_collection = bpy.data.collections.new(asset_task_type_collection_name)
+
+        bpy.context.scene.collection.children.link(asset_collection)
+        asset_collection.children.link(asset_task_type_collection)
+
+        init_modeling_scene_setup(context)
+        init_rigging_scene_setup(asset_active)
+
 classes = (
     BUILD_SHOT_OT_link_selected_assets,
     BUILD_SHOT_OT_add_asset_to_selection,
     BUILD_SHOT_OT_build_shot_layout,
     BUILD_SHOT_OT_build_shot_animation,
     BUILD_SHOT_OT_link_audio,
+    BUILD_SHOT_OT_link_image_ref,
+    BUILD_SHOT_OT_remove_link_image_ref,
     BUILD_SHOT_OT_get_current_context,
     BUILD_SHOT_OT_prev_task_type,
     BUILD_SHOT_OT_next_task_type,

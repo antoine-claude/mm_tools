@@ -114,13 +114,14 @@ def override_metadata_stamp_settings(
     use_stamp_note = rd.use_stamp_note
     stamp_note_text = rd.stamp_note_text
     use_stamp = rd.use_stamp
-    # stamp_font_size = rd.stamp_font_size
+    stamp_font_size = rd.stamp_font_size
     stamp_foreground = rd.stamp_foreground
     stamp_background = rd.stamp_background
     use_stamp_labels = rd.use_stamp_labels
     try:
         # Stamp metadata settings.
         rd.metadata_input = "SCENE"
+        rd.use_stamp = True
         rd.use_stamp_date = False
         rd.use_stamp_time = False
         rd.use_stamp_render_time = False
@@ -133,12 +134,12 @@ def override_metadata_stamp_settings(
         rd.use_stamp_scene = False
         rd.use_stamp_marker = False
         rd.use_stamp_marker = False
-        rd.use_stamp_note = True
+        rd.use_stamp_note = False
         rd.stamp_note_text = f"Shot: {shot.name} | Animator: {first_name} {last_name}"
         rd.use_stamp = True
-        rd.stamp_font_size = 24
+        rd.stamp_font_size = 10
         rd.stamp_foreground = (0.8, 0.8, 0.8, 1)
-        rd.stamp_background = (0, 0, 0, 0.25)
+        rd.stamp_background = (0, 0, 0, 1)
         rd.use_stamp_labels = True
 
         yield
@@ -161,7 +162,7 @@ def override_metadata_stamp_settings(
         rd.use_stamp_note = use_stamp_note
         rd.stamp_note_text = stamp_note_text
         rd.use_stamp = use_stamp
-        # rd.stamp_font_size = stamp_font_size
+        rd.stamp_font_size = stamp_font_size
         rd.stamp_foreground = stamp_foreground
         rd.stamp_background = stamp_background
         rd.use_stamp_labels = use_stamp_labels
@@ -241,6 +242,9 @@ def playblast_with_viewport_settings(self, context, file_path):
         with override_render_format(self, context):
             with override_metadata_stamp_settings(self, context):
                 output_path = ensure_render_path(file_path)
+                area = next(area for area in bpy.context.screen.areas if area.type == 'VIEW_3D')
+                if area:
+                    area.spaces[0].region_3d.view_perspective = 'CAMERA'
                 bpy.ops.render.opengl(animation=True)
                 return output_path
 

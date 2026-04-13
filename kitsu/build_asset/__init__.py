@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import importlib
-from ..shot_build import ops, ui, props
+from ..build_shot import ops, ui, props
 
 
 # ---------REGISTER ----------.

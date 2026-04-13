@@ -12,7 +12,7 @@ from bpy.types import Panel
 from pathlib import Path
 from .core import draw_assets_for_shot, draw_linking_options, draw_asset_filter_and_selector, draw_build_shot_section
 from ..context import core as context_core
-from .. import cache, prefs, ui
+from .. import cache, prefs, ui, bkglobals
 
 class BUILD_SHOT_PT_main_panel(Panel):
     """Main panel for Shot Builder addon"""
@@ -56,15 +56,15 @@ class BUILD_SHOT_PT_main_panel(Panel):
             row_major=True, columns=0, even_columns=True, even_rows=False, align=False
         )
         col = flow.column()
-        # Entity context
-        # col.prop(context.scene.kitsu, "category")
+
 
         if not prefs.session_auth(context) or not project_active:
             row.enabled = False
-
+        # Entity context
         # col.prop(context.scene.kitsu, "category")
         # Episode selector
-        context_core.draw_episode_selector(context, col)
+        if project_active.production_type == bkglobals.KITSU_TV_PROJECT:
+            context_core.draw_episode_selector(context, col)
         if context_core.is_shot_context():
             # Sequence selector
             context_core.draw_sequence_selector(context, col)
@@ -79,21 +79,30 @@ class BUILD_SHOT_PT_main_panel(Panel):
             if context_core.is_department_context(context) :
                 if context_core.is_task_type_list_for_department(context) :
                     context_core.draw_task_type_department_selector(context, col)
-        # Asset selection for the shot
-        col.separator()
 
-        # Display expandable assets section with bool property
-        assets_row = col.row()
-        assets_row.prop(scene.build_shot, "assets_expanded", text="", emboss=False, icon='TRIA_DOWN' if scene.build_shot.assets_expanded else 'TRIA_RIGHT')
-        assets_row.label(text="Assets Selection :")
-        # Only show assets content if expanded
-        layout.use_property_split = False
-        if scene.build_shot.assets_expanded:
-            draw_assets_for_shot(context, col)
-            box = col.box()
-            draw_asset_filter_and_selector(context, box)
-            # Asset filter and selector with split layout
-            draw_linking_options(context, box)
+            col.separator()
+
+            # Asset casting selection for the shot
+            # Display expandable assets section with bool property
+            assets_row = col.row()
+            assets_row.prop(scene.build_shot, "assets_expanded", text="", emboss=False, icon='TRIA_DOWN' if scene.build_shot.assets_expanded else 'TRIA_RIGHT')
+            assets_row.label(text="Assets Selection :")
+            # Only show assets content if expanded
+            layout.use_property_split = False
+            if scene.build_shot.assets_expanded:
+                draw_assets_for_shot(context, col)
+                box = col.box()
+                draw_asset_filter_and_selector(context, box)
+                # Asset filter and selector with split layout
+                draw_linking_options(context, box)
+
+
+        # AssetType selector (if context is Asset)
+        if context_core.is_asset_context():
+            context_core.draw_asset_type_selector(context, col)
+            context_core.draw_asset_selector(context, col)
+            context_core.draw_asset_task_type_selector(context, col)
+
         
 
         # layout.use_property_split = True

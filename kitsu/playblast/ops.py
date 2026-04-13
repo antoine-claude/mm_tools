@@ -54,7 +54,7 @@ class KITSU_OT_playblast_create(bpy.types.Operator):
     )
     confirm: bpy.props.BoolProperty(name="Confirm", default=False)
 
-    task_status: bpy.props.EnumProperty(items=cache.get_all_task_statuses_enum)  # type: ignore
+    task_status: bpy.props.EnumProperty(items=cache.get_all_task_statuses_enum)
 
     thumbnail_frame: bpy.props.IntProperty(
         name="Thumbnail Frame",

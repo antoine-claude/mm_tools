@@ -4,7 +4,7 @@ Provides integration with Kitsu for playblast rendering and task management.
 """
 
 import importlib
-from . import shot_build, prefs, props, auth, playblast, generic
+from . import build_shot, prefs, props, auth, playblast, generic
 
 # ---------- REGISTRATION ----------
 
@@ -12,14 +12,14 @@ from . import shot_build, prefs, props, auth, playblast, generic
 def reload():
     global auth
     global playblast
-    global shot_build
+    global build_shot
     global prefs
     global props
     global generic
 
     auth = importlib.reload(auth)
     playblast = importlib.reload(playblast)
-    shot_build = importlib.reload(shot_build)
+    build_shot = importlib.reload(build_shot)
     prefs = importlib.reload(prefs)
     props = importlib.reload(props)
     generic = importlib.reload(generic)
@@ -30,7 +30,7 @@ def register():
     auth.register()
     generic.register()
     playblast.register()
-    shot_build.register()
+    build_shot.register()
     prefs.register()
 
 
@@ -39,7 +39,7 @@ def unregister():
     auth.unregister()
     generic.unregister()
     playblast.unregister()
-    shot_build.unregister()
+    build_shot.unregister()
     prefs.unregister()
     props.unregister()
 

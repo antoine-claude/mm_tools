@@ -7,8 +7,10 @@ class COPY_OUTPUT_property_group(bpy.types.PropertyGroup):
         name="Layer",
         description="Choix du layer de sortie",
         items=[
+            ('LAY', "LAY", ""),
             ('LAY1', "LAY1", ""),
             ('LAY2', "LAY2", ""),
+            ('SPL', "SPL", ""),
             ('SPL1', "SPL1", ""),
             ('SPL1', "SPL1", ""),
             ('SPL3', "SPL3", ""),

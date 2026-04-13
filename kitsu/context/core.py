@@ -19,6 +19,17 @@ def is_shot_context():
     return bpy.context.scene.kitsu.category == "SHOT"
 
 
+def is_department_context(context: bpy.types.Context) -> bool:
+    return bool(context.scene.kitsu.department_active_name)
+
+def is_task_type_list_for_department(context: bpy.types.Context) -> bool:
+    if not context.scene.kitsu.department_active_name:
+        return False
+    task_types_for_department = cache.get_all_task_types_for_department(cache.department_active_get())
+    return bool(task_types_for_department)
+
+
+
 def active_project_row(layout: bpy.types.UILayout) -> bpy.types.UILayout:
     project_active = cache.project_active_get()
     row = layout.row(align=True)
@@ -69,14 +80,17 @@ def draw_asset_type_selector(context: bpy.types.Context, layout: bpy.types.UILay
 def draw_shot_selector(context: bpy.types.Context, layout: bpy.types.UILayout) -> None:
     row = active_sequence_row(layout)
     row.prop(context.scene.kitsu, "shot_active_name")
-    row.operator("build_shot.prev_shot", text="", icon="REMOVE")
-    row.operator("build_shot.next_shot", text="", icon="ADD")
+    row.operator("kitsu.prev_shot", text="", icon="REMOVE")
+    row.operator("kitsu.next_shot", text="", icon="ADD")
 
 
 def draw_asset_selector(context: bpy.types.Context, layout: bpy.types.UILayout) -> None:
     row = active_project_row(layout)
     row.prop(context.scene.kitsu, "asset_active_name")
 
+def draw_asset_task_type_selector(context: bpy.types.Context, layout: bpy.types.UILayout) -> None:
+    row = active_project_row(layout)
+    row.prop(context.scene.kitsu, "task_type_active_name")
 
 def draw_edit_selector(context: bpy.types.Context, layout: bpy.types.UILayout) -> None:
     row = active_project_row(layout)
@@ -89,19 +103,10 @@ def draw_department_selector(context, layout):
     row = active_sequence_row(layout)
 
     row.prop(context.scene.kitsu, "department_active_name")
-    row.operator("build_shot.prev_task_type", text="", icon="REMOVE")
-    row.operator("build_shot.next_task_type", text="", icon="ADD")
+    row.operator("kitsu.prev_task_type", text="", icon="REMOVE")
+    row.operator("kitsu.next_task_type", text="", icon="ADD")
 
 def draw_task_type_department_selector(context: bpy.types.Context, layout: bpy.types.UILayout):
     row = active_department_row(layout)
     row.prop(context.scene.kitsu, "task_type_department_active_name")
-
-def is_department_context(context: bpy.types.Context) -> bool:
-    return bool(context.scene.kitsu.department_active_name)
-
-def is_task_type_list_for_department(context: bpy.types.Context) -> bool:
-    if not context.scene.kitsu.department_active_name:
-        return False
-    task_types_for_department = cache.get_all_task_types_for_department(cache.department_active_get())
-    return bool(task_types_for_department)
 
