@@ -28,7 +28,7 @@ def override_render_format(self, context, enable_sequencer: bool = False):
         rd.image_settings.file_format = "FFMPEG"
         rd.ffmpeg.constant_rate_factor = 'MEDIUM'
         rd.ffmpeg.codec = "H264"
-        rd.ffmpeg.format = "MPEG4"
+        rd.ffmpeg.format = "QUICKTIME"
         rd.ffmpeg.audio_codec = "AAC"
 
         yield

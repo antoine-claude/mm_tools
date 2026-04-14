@@ -122,7 +122,7 @@ def get_playblast_file(self: Any) -> str:
     task_type = cache.task_type_active_get()
     delimiter = bkglobals.DELIMITER
 
-    # 070_0010_A-anim.mp4
+    # 070_0010_A-anim.mov
 
     kitsu_props = scene.kitsu
     kitsu_props.get("category")
@@ -141,7 +141,7 @@ def get_playblast_file(self: Any) -> str:
     task_name = scene.copy_output.copy_output_layer
 
 
-    file_name = "_".join(filter(None, ["MM", episode.name, shot.name, task_name,])) + ".mp4"
+    file_name = "_".join(filter(None, ["MM", episode.name, shot.name, task_name,])) + ".mov"
 
     return Path(self.playblast_dir).joinpath(file_name).as_posix()
 

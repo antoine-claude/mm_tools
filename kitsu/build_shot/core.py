@@ -761,7 +761,7 @@ def set_render_filepath(context):
     shot = cache.shot_active_get()
     task_name = scene.copy_output.copy_output_layer
     output_path = get_new_output_path(bpy.context)
-    file_name = "_".join(filter(None, ["MM", episode.name, shot.name, task_name,])) + ".mp4"
+    file_name = "_".join(filter(None, ["MM", episode.name, shot.name, task_name,])) + ".mov"
     playblast_path = Path(output_path).parent.joinpath("playblast", file_name).as_posix()
     # print(f"[OK] Render filepath set to: {playblast_path}")
     if output_path:

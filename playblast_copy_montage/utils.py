@@ -39,8 +39,8 @@ def get_playblast_dest_file(scene):
     filename = os.path.basename(
         bpy.path.abspath(scene.render.filepath)
     )
-    if not filename.endswith(".mp4"):
-        filename += ".mp4"
+    if not filename.endswith(".mov"):
+        filename += ".mov"
     new_copy_path = os.path.join(base_dest,ep,f"EP{ep}_{layer}",filename)
     if not "UNKNOWN" in new_copy_path :
 
