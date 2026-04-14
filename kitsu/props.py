@@ -670,6 +670,12 @@ class KITSU_property_group_scene(bpy.types.PropertyGroup):
         ],
     )
 
+    playblast_send_to_kitsu: bpy.props.BoolProperty(  # type: ignore
+        name="Send to Kitsu",
+        description="Automatically upload the playblast to Kitsu after it's done and set the playblast task status to 'playblast_uploaded'",
+        default=True,
+    )
+
     # Sequence editor tools.
     pull_edit_channel: bpy.props.IntProperty(
         name="Channel",

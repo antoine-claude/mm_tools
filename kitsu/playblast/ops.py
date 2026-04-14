@@ -197,15 +197,16 @@ class KITSU_OT_playblast_create(bpy.types.Operator):
         context.window_manager.progress_update(1)
 
         # Upload playblast
-        try:
-            self._upload_playblast(context, output_path)
-        except gazu.exception.NotAllowedException:
-            self.report(
-                {"ERROR"},
-                f"Failed to upload playblast. You don't have permission to add comments to this task",
-            )
-            return {"CANCELLED"}
-            
+        if kitsu_scene_props.playblast_send_to_kitsu :
+            try:
+                self._upload_playblast(context, output_path)
+            except gazu.exception.NotAllowedException:
+                self.report(
+                    {"ERROR"},
+                    f"Failed to upload playblast. You don't have permission to add comments to this task",
+                )
+                return {"CANCELLED"}
+                
         context.window_manager.progress_update(2)
         context.window_manager.progress_end()
 
@@ -315,13 +316,16 @@ class KITSU_OT_playblast_create(bpy.types.Operator):
 
     def draw(self, context: bpy.types.Context) -> None:
         layout = self.layout
+        layout.prop(context.scene.kitsu, "playblast_send_to_kitsu", text="Send to Kitsu")   
         layout.use_property_split = True
         layout.use_property_decorate = False
-        layout.prop(self, "task_status", text="Status")
-        layout.prop(self, "comment")
-        layout.prop(self, "thumbnail_frame")
-        if not self.is_vse(context):
-            layout.prop(context.scene.kitsu, "playblast_render_mode", text="Render Mode")
+        if context.scene.kitsu.playblast_send_to_kitsu :
+            layout.prop(self, "task_status", text="Status")
+            layout.prop(self, "comment")
+            layout.prop(self, "thumbnail_frame")
+            if not self.is_vse(context):
+                layout.prop(context.scene.kitsu, "playblast_render_mode", text="Render Mode")
+        
 
     def _upload_playblast(self, context: bpy.types.Context, filepath: Path) -> None:
         # Create a comment
