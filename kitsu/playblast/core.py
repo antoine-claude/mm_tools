@@ -17,18 +17,20 @@ def override_render_format(self, context, enable_sequencer: bool = False):
     # Format render settings.
     # percentage = rd.resolution_percentage
     file_format = rd.image_settings.file_format
-    ffmpeg_constant_rate = rd.ffmpeg.constant_rate_factor
-    ffmpeg_codec = rd.ffmpeg.codec
     ffmpeg_format = rd.ffmpeg.format
+    ffmpeg_codec = rd.ffmpeg.codec
+    ffmpeg_constant_rate = rd.ffmpeg.constant_rate_factor
+    ffmpeg_preset = rd.ffmpeg.ffmpeg_preset
     ffmpeg_audio_codec = rd.ffmpeg.audio_codec
 
     try:
         # rd.resolution_percentage = 100
         rd.use_sequencer = enable_sequencer
         rd.image_settings.file_format = "FFMPEG"
-        rd.ffmpeg.constant_rate_factor = 'MEDIUM'
-        rd.ffmpeg.codec = "H264"
         rd.ffmpeg.format = "QUICKTIME"
+        rd.ffmpeg.codec = "H264"
+        rd.ffmpeg.constant_rate_factor = 'MEDIUM'
+        rd.ffmpeg.ffmpeg_preset = 'GOOD'
         rd.ffmpeg.audio_codec = "AAC"
 
         yield
@@ -37,9 +39,10 @@ def override_render_format(self, context, enable_sequencer: bool = False):
         # rd.resolution_percentage = percentage
         rd.use_sequencer = use_sequencer
         rd.image_settings.file_format = file_format
+        rd.ffmpeg.format = ffmpeg_format
         rd.ffmpeg.codec = ffmpeg_codec
         rd.ffmpeg.constant_rate_factor = ffmpeg_constant_rate
-        rd.ffmpeg.format = ffmpeg_format
+        rd.ffmpeg.ffmpeg_preset = ffmpeg_preset
         rd.ffmpeg.audio_codec = ffmpeg_audio_codec
 
 
@@ -136,7 +139,6 @@ def override_metadata_stamp_settings(
         rd.use_stamp_marker = False
         rd.use_stamp_note = False
         rd.stamp_note_text = f"Shot: {shot.name} | Animator: {first_name} {last_name}"
-        rd.use_stamp = True
         rd.stamp_font_size = 10
         rd.stamp_foreground = (0.8, 0.8, 0.8, 1)
         rd.stamp_background = (0, 0, 0, 1)
@@ -238,13 +240,13 @@ def playblast_with_scene_settings(self, context, file_path):
 
 
 def playblast_with_viewport_settings(self, context, file_path):
+    output_path = ensure_render_path(file_path)
+    area = next(area for area in bpy.context.screen.areas if area.type == 'VIEW_3D')
+    if area:
+        area.spaces[0].region_3d.view_perspective = 'CAMERA'
     with override_render_path(self, context, file_path):
         with override_render_format(self, context):
             with override_metadata_stamp_settings(self, context):
-                output_path = ensure_render_path(file_path)
-                area = next(area for area in bpy.context.screen.areas if area.type == 'VIEW_3D')
-                if area:
-                    area.spaces[0].region_3d.view_perspective = 'CAMERA'
                 bpy.ops.render.opengl(animation=True)
                 return output_path
 
