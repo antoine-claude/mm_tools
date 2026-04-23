@@ -32,8 +32,6 @@ def register():
     op_save_increment.register()
     toolbar_menu.register()
     keymaps_and_menus.register_keymaps()
-    # Attach the File menu custom draw (centralized here to ensure both
-    # modules are available when assigning)
 
 
 def unregister():

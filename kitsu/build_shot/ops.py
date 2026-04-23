@@ -8,7 +8,8 @@ import bpy
 import os
 from bpy.types import Operator
 from .. import cache, prefs
-from .core import import_sound_strip, import_image_ref, init_modeling_scene_setup, init_rigging_scene_setup, set_shot_filepath, link_selected_assets, get_highest_version_file, get_audio_path, set_scene_settings, set_frames_timeline, get_sorted_task_types_for_shot
+from .core import import_sound_strip, import_image_ref, init_animation_shot, init_layout_shot, set_shot_filepath, link_selected_assets, get_highest_version_file, get_audio_path, set_scene_settings, set_frames_timeline, get_sorted_task_types_for_shot
+from ..build_asset.core import init_modeling_scene_setup, init_rigging_scene_setup
 from ..types import (
     Shot,
     Department,
@@ -105,7 +106,6 @@ class BUILD_SHOT_OT_link_audio(Operator):
         scene = context.scene
         try:
             import_sound_strip(context)
-            self.report({'INFO'}, "Audio linked successfully")
             return {'FINISHED'}
         except FileNotFoundError as e:
             self.report({'ERROR'}, str(e))
@@ -125,7 +125,6 @@ class BUILD_SHOT_OT_link_image_ref(Operator):
         scene = context.scene
         try:
             import_image_ref(context)
-            self.report({'INFO'}, "Image reference linked successfully")
             return {'FINISHED'}
         except FileNotFoundError as e:
             self.report({'ERROR'}, str(e))
@@ -159,10 +158,10 @@ class BUILD_SHOT_OT_remove_link_image_ref(Operator):
             self.report({'ERROR'}, f"Error removing image reference: {str(e)}")
             return {'CANCELLED'}
 
-class BUILD_SHOT_OT_build_shot_layout(Operator):
-    """Buld and save the current scene as a shot file"""
-    bl_idname = "kitsu.build_shot_layout"
-    bl_label = "Build Shot Layout"
+class BUILD_SHOT_OT_build_shot(Operator):
+    """Build and save the current scene as a shot file"""
+    bl_idname = "kitsu.build_shot"
+    bl_label = "Build Shot"
     bl_description = "Save the current scene with the selected shot name"
     bl_options = {'REGISTER'}
 
@@ -189,86 +188,25 @@ class BUILD_SHOT_OT_build_shot_layout(Operator):
         if not selected_shot or selected_shot.name == "NONE":
             self.report({'ERROR'}, "Please select a shot")
             return {'CANCELLED'}
-        
-        # Use helper to get shot directory and filepath
-        
-        #If previous shot exist in sequence, duplicate file of prev_selected_shot uppper priority
 
-        prod_dir = str(prefs.project_root_dir_get(context))
-        filepath = set_shot_filepath(prod_dir, selected_ep.name, selected_sequence.name,
-                        selected_shot.name, department.name, task_type.name
-                        )
+        # if not task_type or getattr(task_type, "name", "NONE") == "NONE":
+        #     self.report({'ERROR'}, "Please select a task type")
+        #     return {'CANCELLED'}
         
-        if os.path.exists(filepath) :
-            self.report({'ERROR'}, "This shot already exist")
+        try:
+            if department.name == "Layout":
+                init_layout_shot(self, context)
+                return {'FINISHED'}
+
+            if task_type.name == "Spline":
+                init_animation_shot(self, context)
+                return {'FINISHED'}
+
+            self.report({'ERROR'}, f"Unsupported task type: {task_type.name}")
             return {'CANCELLED'}
-        
-        #Look old shot
-        all_shots = selected_sequence.get_all_shots()
 
-        for i, shot in enumerate(all_shots):
-            if shot.name == selected_shot.name and i > 0:
-                # print("shot.name == selected_shot",shot.name)
-                prev_shot = all_shots[i - 1]
-                prev_shot_name = prev_shot.name
-                break
-        
-        #Create file from last shot or from 0 
-        if prev_shot_name and self.confirm_copy:
-
-            prev_task_type = TaskType.by_id(self.previous_shot_task_type)
-            prev_department = prev_task_type.get_department()
-
-            prev_filepath = set_shot_filepath(
-                prod_dir,
-                selected_ep.name,
-                selected_sequence.name,
-                prev_shot_name,
-                prev_department.name,
-                prev_task_type.name,
-            )
-
-            if os.path.exists(prev_filepath):
-                shutil.copy(prev_filepath, filepath)
-            else:
-                self.report({'WARNING'}, "Previous file not found, creating empty scene")
-                self._create_empty_scene(context)
-
-        else:
-            self._create_empty_scene(context)
-
-
-        #Set camera
-        for obj in bpy.data.objects:
-            if obj.type == 'CAMERA' :
-                bpy.data.scenes["Scene"].camera = obj
-                break
-        # Link sounds
-        try:
-            import_sound_strip(context)
-            self.report({'INFO'}, "Audio linked successfully")
-        except FileNotFoundError as e:
-            self.report({'ERROR'}, str(e))
-        import_image_ref(context)
-        set_frames_timeline(context)
-        #Set base settings for scene
-        set_scene_settings(context)
-
-        # `read_homefile()` can recreate Scene datablocks, so refresh the reference.
-        scene = context.scene
-        scene.render.filepath = scene.build_shot.output_path
-
-
-        try:
-            bpy.ops.wm.save_as_mainfile(filepath=filepath)
-            print("filepath : " , filepath)
-            self.report({'INFO'}, f"Shot saved: {filepath}")
-            #Detect current context
-            bpy.ops.kitsu.get_current_context()
-
-            return {'FINISHED'}
         except Exception as e:
-            self.report({'ERROR'}, f"Failed to save shot: {str(e)}")
+            self.report({'ERROR'}, f"Build shot failed: {e}")
             return {'CANCELLED'}
         
     def invoke(self, context, event):
@@ -276,7 +214,6 @@ class BUILD_SHOT_OT_build_shot_layout(Operator):
         # items.append(cache.get_shot_task_types_enum_for_shot)
 
         return context.window_manager.invoke_props_dialog(self)
-
 
     def draw(self, context):
         layout = self.layout
@@ -286,115 +223,6 @@ class BUILD_SHOT_OT_build_shot_layout(Operator):
         if self.confirm_copy :
             layout.prop(self, "previous_shot_task_type", text="")
 
-    def _create_empty_scene(self, context):
-
-        bpy.ops.wm.read_homefile(app_template="")
-
-        for collection in list(bpy.data.collections):
-            bpy.data.collections.remove(collection)
-
-        for obj in list(bpy.data.objects):
-            bpy.data.objects.remove(obj)
-
-        try:            
-            result = link_selected_assets(context)
-            success_count = result['success_count']
-            if success_count == 0:
-                self.report({'ERROR'}, "Failed to link any assets")
-                return {'CANCELLED'}
-        except Exception as e:
-            self.report({'ERROR'}, f"Failed to link assets: {str(e)}")
-            return {'CANCELLED'}      
-
-        # Link sounds
-        try:
-            #Remove sound strips linked from previous shot if exist
-            for sequence in bpy.context.scene.sequence_editor.sequences:
-                if sequence.type == 'SOUND':
-                    bpy.context.scene.sequence_editor.sequences.remove(sequence)
-            import_sound_strip(context)
-            self.report({'INFO'}, "Audio linked successfully")
-        except FileNotFoundError as e:
-            self.report({'ERROR'}, str(e))
-        
-        set_frames_timeline(context)
-        #Set base settings for scene
-        set_scene_settings(context)
-
-class BUILD_SHOT_OT_build_shot_animation(Operator):
-    """Build and save the current scene as an animation shot file"""
-    bl_idname = "kitsu.build_shot_animation"
-    bl_label = "Build Shot Animation"
-    bl_description = "Save the current scene with the selected shot name"
-    bl_options = {'REGISTER'}
-    
-    def execute(self, context):
-        scene = context.scene
-        selected_ep = context.scene.kitsu.episode_active_name
-        selected_sequence = context.scene.kitsu.sequence_active_name
-        selected_shot = context.scene.kitsu.shot_active_name
-        department = scene.kitsu.department_active_name
-        task_type = scene.kitsu.task_type_department_active_name
-        
-        if not selected_ep or selected_ep == "NONE":
-            self.report({'ERROR'}, "Please select an episode")
-            return {'CANCELLED'}
-        
-        if not selected_shot or selected_shot == "NONE":
-            self.report({'ERROR'}, "Please select a shot")
-            return {'CANCELLED'}
-        
-        if department != "Animation":
-            self.report({'ERROR'}, "Animation folder type must be selected")
-            return {'CANCELLED'}
-        
-        # Use helper to get shot directory and filepath
-        prod_dir = str(prefs.project_root_dir_get(context))
-        filepath = set_shot_filepath(prod_dir, selected_ep, selected_sequence, selected_shot, department, task_type)
-        
-        
-        #Import sound strip
-        if os.path.exists(get_audio_path(prod_dir, selected_ep, selected_shot)) :
-            import_sound_strip(context)
-        else :
-            self.report({'WARNING'}, "No audio found for this shot")
-        set_frames_timeline(context)
-        #Set base settings for scene
-        set_scene_settings(context)
-
-        #Get previous department and task type to find source file for animation build
-        previous_department = None
-        previous_task_type = None
-        shot = cache.shot_active_get()
-        if shot:
-            task_types = shot.get_all_task_types()
-            task_types_sorted = sorted(task_types, key=lambda t: t.priority)
-            for t in task_types_sorted:
-                if t.name == task_type:
-                    break
-                previous_task_type = t
-            
-            if previous_task_type:
-                previous_department = previous_task_type.get_department()
-        if not previous_department or not previous_task_type:
-            self.report({'ERROR'}, "No previous department/task type found for this shot")
-            return {'CANCELLED'}
-        
-        source_filepath = get_highest_version_file(
-            set_shot_filepath(prod_dir, selected_ep, selected_sequence, selected_shot, previous_department.name, previous_task_type.name)
-            )
-        
-        if not source_filepath:
-            self.report({'ERROR'}, "No source file found for animation build")
-            return {'CANCELLED'}
-        # copy source file to new filepath & open it
-        try:
-            shutil.copy2(source_filepath, filepath)
-            self.report({'INFO'}, f"Shot saved: {filepath}")
-            bpy.ops.wm.open_mainfile(filepath=filepath)              
-            return {'FINISHED'}
-        except Exception as e:
-            self.report({'ERROR'}, f"Failed to build animation shot: {str(e)}")
 
 class BUILD_SHOT_OT_get_current_context(Operator):
     """Get the current context from filepath and set active episode/sequence/shot in Kitsu props"""
@@ -641,8 +469,7 @@ class BUILD_ASSETS_OT_build(Operator):
 classes = (
     BUILD_SHOT_OT_link_selected_assets,
     BUILD_SHOT_OT_add_asset_to_selection,
-    BUILD_SHOT_OT_build_shot_layout,
-    BUILD_SHOT_OT_build_shot_animation,
+    BUILD_SHOT_OT_build_shot,
     BUILD_SHOT_OT_link_audio,
     BUILD_SHOT_OT_link_image_ref,
     BUILD_SHOT_OT_remove_link_image_ref,

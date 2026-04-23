@@ -65,7 +65,7 @@ def remap_output_path(scene):
         scene.render.filepath = os.path.join(os.path.dirname(blend_path), f"{merge_parts}_LAY.mov")
         return os.path.join(os.path.dirname(blend_path), f"{merge_parts}_LAY.mov")
     
-    elif dir_name == "Animation_Spline":
+    elif dir_name == "Spline":
         parts_anim = blend_name.split("_")[:-1]
         for i, part in enumerate(parts_anim) :
             if part == "001" :
@@ -74,10 +74,5 @@ def remap_output_path(scene):
         scene.render.filepath = os.path.join(os.path.dirname(blend_path), f"{merge_parts_anim}.mov")
         return os.path.join(os.path.dirname(blend_path), f"{merge_parts_anim}.mov")
     
-    if dir_name == "Animation_Stopmo" :
-        scene.render.filepath = os.path.join(os.path.dirname(blend_path), f"{merge_parts}_SPL.mov")
-        return os.path.join(os.path.dirname(blend_path), f"{merge_parts}_SPL.mov")
-    
-
     else:
         return None

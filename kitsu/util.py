@@ -22,7 +22,7 @@ import re
 from typing import Union
 
 import bpy
-
+import os
 from . import bkglobals
 
 
@@ -44,3 +44,42 @@ def get_version(str_value: str, format: type = str) -> Union[str, int, None]:
         if format == int:
             return int(version.replace("v", ""))
     return None
+
+
+def get_asset_path(asset_name, asset_dir):
+
+    # parts = asset_name.split('_')
+    # asset_type = "FX" if len(parts) > 2 and parts[2].startswith("FX") else (parts[1] if len(parts) > 1 else None)
+    asset_type = asset_name.split('_')[1] if len(asset_name.split('_')) > 1 else None
+
+    if asset_type == 'CHR':
+        return os.path.join(
+            asset_dir, "Characters", asset_name, 
+            "Final", "Render", f"{asset_name}.blend"
+        )
+    elif asset_type == 'PRP':
+        return os.path.join(
+            asset_dir, "Props", asset_name, 
+            "Final", "Render", f"{asset_name}.blend"
+        )
+    elif asset_type == 'ITM':
+        return os.path.join(
+            asset_dir, "SetItems", asset_name, 
+            "Final", "Render", f"{asset_name}.blend"
+        )
+    elif asset_type == 'SET':
+        return os.path.join(
+            asset_dir, "Sets", asset_name, 
+            "Final", "Render", f"{asset_name}.blend"
+        )
+    # elif asset_type == 'FX':
+    #     return os.path.join(
+    #         asset_dir, "SetItems", asset_name, 
+    #         "Final", "Render", f"{asset_name}.blend"
+    #     )
+    elif asset_name == "MM_Camera":
+        return os.path.join(
+            asset_dir, "Camera", f"{asset_name}.blend"
+        )
+    else:
+        return None

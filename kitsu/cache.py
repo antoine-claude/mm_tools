@@ -1094,7 +1094,6 @@ def clear_buildshot_properties() -> None:
                 except Exception:
                     pass
 
-
 def update_buildshot_candidates_for_active_shot(context: bpy.types.Context) -> None:
     """Update build_shot_candidates properties when active shot changes.
     

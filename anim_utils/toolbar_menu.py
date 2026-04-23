@@ -20,14 +20,14 @@ def custom_file_mm_menu_draw(self, context):
 # -------------------------------------------------------------------
 # REGISTER
 
-classes = (VIEW3D_MT_MM,)
+classes = (VIEW3D_MT_MM,
+           )
 def register():
     for c in classes:
         bpy.utils.register_class(c)
     bpy.types.VIEW3D_MT_editor_menus.append(custom_file_mm_menu_draw)    
-    # TOPBAR draw assignment moved to package `__init__.py` to centralize menu hooks
+
 def unregister():
+    bpy.types.VIEW3D_MT_editor_menus.remove(custom_file_mm_menu_draw)
     for c in classes:
         bpy.utils.unregister_class(c)
-    bpy.types.VIEW3D_MT_editor_menus.remove(custom_file_mm_menu_draw)
-    # TOPBAR draw cleanup handled by package `__init__.py`

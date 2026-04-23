@@ -21,12 +21,14 @@ class BUILD_SHOT_PT_main_panel(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "Kitsu"
+    bl_options = {"DEFAULT_CLOSED"}
+    bl_order = 30
 
     @classmethod
     def poll(cls, context: bpy.types.Context) -> bool:
         """Show panel if Kitsu is authenticated"""
-        return prefs.session_auth(context)
-
+        return prefs.session_auth(context) and context_core.is_shot_context()
+    
     @classmethod
     def poll_error(cls, context: bpy.types.Context) -> bool:
         project_active = cache.project_active_get()
@@ -48,9 +50,6 @@ class BUILD_SHOT_PT_main_panel(Panel):
 
         # Production header
         row = layout.row()
-        row.label(text=f"Production: {project_active.name}")
-        row.operator("kitsu.get_current_context", text="", icon="FILE_REFRESH" )
-        
         
         flow = layout.grid_flow(
             row_major=True, columns=0, even_columns=True, even_rows=False, align=False
@@ -60,30 +59,16 @@ class BUILD_SHOT_PT_main_panel(Panel):
 
         if not prefs.session_auth(context) or not project_active:
             row.enabled = False
-        # Entity context
-        # col.prop(context.scene.kitsu, "category")
-        # Episode selector
-        if project_active.production_type == bkglobals.KITSU_TV_PROJECT:
-            context_core.draw_episode_selector(context, col)
+
         if context_core.is_shot_context():
-            # Sequence selector
-            context_core.draw_sequence_selector(context, col)
-            # Shot selector
-            context_core.draw_shot_selector(context, col)
-            col.separator()
-            #Department selector
-            context_core.draw_department_selector(context, col)
-            #Task type selector selector
-            context_core.is_task_type_list_for_department(context)
-
-            if context_core.is_department_context(context) :
-                if context_core.is_task_type_list_for_department(context) :
-                    context_core.draw_task_type_department_selector(context, col)
-
-            col.separator()
-
             # Asset casting selection for the shot
             # Display expandable assets section with bool property
+            scene = context.scene
+            shot_active = cache.shot_active_get()
+            
+            if not shot_active or not shot_active.id:
+                layout.label(text="Select a shot first", icon='INFO')
+                return
             assets_row = col.row()
             assets_row.prop(scene.build_shot, "assets_expanded", text="", emboss=False, icon='TRIA_DOWN' if scene.build_shot.assets_expanded else 'TRIA_RIGHT')
             assets_row.label(text="Assets Selection :")
@@ -95,15 +80,6 @@ class BUILD_SHOT_PT_main_panel(Panel):
                 draw_asset_filter_and_selector(context, box)
                 # Asset filter and selector with split layout
                 draw_linking_options(context, box)
-
-
-        # AssetType selector (if context is Asset)
-        if context_core.is_asset_context():
-            context_core.draw_asset_type_selector(context, col)
-            context_core.draw_asset_selector(context, col)
-            context_core.draw_asset_task_type_selector(context, col)
-
-        
 
         # layout.use_property_split = True
         # flow = layout.grid_flow(

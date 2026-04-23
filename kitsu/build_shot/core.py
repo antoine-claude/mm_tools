@@ -1,43 +1,21 @@
-import re
-
 import bpy
 import os
 from .. import cache, bkglobals, prefs
 from ..context import core as context_core
 from pathlib import Path
 import shutil
+from ..util import get_asset_path
+from ..types import (
+    TaskType,
+    Asset
+    )
+from ..filetrees.filetree_media import filetree_media
 # Category values are defined in enum props.py KITSU_property_group_scene under category
-def is_edit_context():
-    return bpy.context.scene.kitsu.category == "EDIT"
-
-
-def is_sequence_context():
-    return bpy.context.scene.kitsu.category == "SEQ"
-
-
-def is_asset_context():
-    return bpy.context.scene.kitsu.category == "ASSET"
-
-
-def is_shot_context():
-    return bpy.context.scene.kitsu.category == "SHOT"
-
-
-def draw_department_selector(context: bpy.types.Context, layout: bpy.types.UILayout) -> None:
-    """Draw output layer selection (department and animation task_type)"""
-    layout.label(text="Department :")
-    row = layout.row(align=True)
-    row.prop(context.scene.build_shot, "department_active_name")
-
-def draw_output_task_type_department_selector(context: bpy.types.Context, layout: bpy.types.UILayout) -> None:
-    """Draw task type for department selector, only if department is set to Animation"""
-    if cache.department_active_get().name == "Animation":
-        row = layout.row(align=True)
-        row.prop(context.scene.kitsu, "task_type_department_active_name")
 
 def draw_asset_filter_and_selector(context: bpy.types.Context, layout: bpy.types.UILayout) -> None:
     """Draw asset type selector, asset scope, and asset selection in split row"""
     # Asset type selector - from global kitsu context (kitsu.asset_type_active_name)
+    
     layout.label(text="Add Asset out of casting : ")
     box = layout.box()
     split_scope = box.split(factor=1.0)
@@ -75,7 +53,13 @@ def draw_build_shot_section(context: bpy.types.Context, layout: bpy.types.UILayo
     # if not department or not department.id:
     #     print("No active department")
     # else:
+    if cache.task_type_department_active_get():
+        task_type = cache.task_type_department_active_get()
+    else : 
+        task_type = cache.department_active_get()
+
     task_types = cache.get_all_task_types_for_department(department)
+    # task_type = cache.task_type_active_get()
 
     if task_types is None:
         row = layout.row(align=True)
@@ -97,18 +81,11 @@ def draw_build_shot_section(context: bpy.types.Context, layout: bpy.types.UILayo
                        icon="ERROR")
             return
         # Build shot button - conditional based on type_folder
-        if context.scene.kitsu.department_active_name == "Animation":
-            layout.operator(
-                "kitsu.build_shot_animation",
-                text="Build Animation Shot",
-                icon='FILE_TICK'
-            )
-        else:
-            layout.operator(
-                "kitsu.build_shot_layout",
-                text="Build Layout Shot",
-                icon='FILE_TICK'
-            )
+        layout.operator(
+            "kitsu.build_shot",
+            text=f"Build {task_type.name} Shot",
+            icon='FILE_TICK'
+        )
         layout.label(text=f"{output_path}")
 
 
@@ -128,7 +105,6 @@ def draw_build_shot_section(context: bpy.types.Context, layout: bpy.types.UILayo
 
             layout.label(text=f"Shot already built: {highest_version}",
                         icon="CHECKMARK")
-
 
 def draw_assets_for_shot(context: bpy.types.Context, layout: bpy.types.UILayout) -> None:
     """Draw assets available for the selected shot plus any manually-added assets"""
@@ -291,6 +267,214 @@ def draw_linking_options(context: bpy.types.Context, layout: bpy.types.UILayout)
 Core utilities for build_shot addon
 """
 
+def get_prod_dir(context):
+    return str(prefs.project_root_dir_get(context))
+
+def get_media_path(media_type, prod_dir, episode, shot):
+    template = filetree_media[media_type]
+    folder_path = template["folder_path"].replace("<Episode>", str(episode))
+    file_name = template["file_name"].replace("<Episode>", str(episode)).replace("<Shot>", str(shot))
+    return os.path.join(prod_dir, folder_path, file_name)
+
+def init_layout_shot(self, context):
+    scene = context.scene
+    selected_ep = cache.episode_active_get()
+    selected_sequence = cache.sequence_active_get()
+    selected_shot = cache.shot_active_get()
+    department = cache.department_active_get()
+    task_type = cache.task_type_department_active_get()
+    
+    if not selected_ep or selected_ep.name == "NONE":
+        self.report({'ERROR'}, "Please select an episode")
+        return {'CANCELLED'}
+    
+    if not selected_shot or selected_shot.name == "NONE":
+        self.report({'ERROR'}, "Please select a shot")
+        return {'CANCELLED'}
+    
+    # Use helper to get shot directory and filepath
+    prod_dir = get_prod_dir(context)
+    filepath = set_shot_filepath(prod_dir, selected_ep.name, selected_sequence.name,
+                        selected_shot.name, department.name, task_type.name
+                        )
+    
+    if os.path.exists(filepath) :
+        self.report({'ERROR'}, "This shot already exist")
+        return {'CANCELLED'}
+    
+    #Look old shot-
+    all_shots = selected_sequence.get_all_shots()
+
+    for i, shot in enumerate(all_shots):
+        if shot.name == selected_shot.name and i > 0:
+            # print("shot.name == selected_shot",shot.name)
+            prev_shot = all_shots[i - 1]
+            prev_shot_name = prev_shot.name
+            break
+    
+    #Create file from last shot or from 0 
+    if prev_shot_name and self.confirm_copy:
+
+        prev_task_type = TaskType.by_id(self.previous_shot_task_type)
+        prev_department = prev_task_type.get_department()
+
+        prev_filepath = set_shot_filepath(
+            prod_dir,
+            selected_ep.name,
+            selected_sequence.name,
+            prev_shot_name,
+            prev_department.name,
+            prev_task_type.name,
+        )
+
+        if os.path.exists(prev_filepath):
+            shutil.copy(prev_filepath, filepath)
+        else:
+            self.report({'WARNING'}, "Previous file not found, creating empty scene")
+            create_empty_scene(context, self)
+
+    else:
+        create_empty_scene(context, self)
+
+
+    #Set camera
+    for obj in bpy.data.objects:
+        if obj.type == 'CAMERA' :
+            bpy.data.scenes["Scene"].camera = obj
+            break
+    # Link sounds
+    try:
+        import_sound_strip(context)
+        self.report({'INFO'}, "Audio linked successfully")
+    except FileNotFoundError as e:
+        self.report({'WARNING'}, str(e))
+    try :
+        import_image_ref(context)
+    except FileNotFoundError as e:
+        self.report({'WARNING'}, str(e))
+
+    set_frames_timeline(context)
+    #Set base settings for scene
+    set_scene_settings(context)
+
+    # `read_homefile()` can recreate Scene datablocks, so refresh the reference.
+    scene = context.scene
+    scene.render.filepath = scene.build_shot.output_path
+
+
+    try:
+        bpy.ops.wm.save_as_mainfile(filepath=filepath)
+        print("filepath : " , filepath)
+        #Detect current context
+        bpy.ops.kitsu.get_current_context()
+        self.report({'INFO'}, f"Shot saved: {filepath}")
+        return {'FINISHED'}
+
+    except Exception as e:
+        self.report({'ERROR'}, f"Failed to save shot: {str(e)}")
+        return {'CANCELLED'}
+
+def init_animation_shot(self, context):
+    scene = context.scene
+    selected_ep = cache.episode_active_get()
+    selected_sequence = cache.sequence_active_get()
+    selected_shot = cache.shot_active_get()
+    department = cache.department_active_get()
+    task_type = cache.task_type_department_active_get()
+    
+    if not selected_ep or selected_ep.name == "NONE":
+        self.report({'ERROR'}, "Please select an episode")
+        return {'CANCELLED'}
+    
+    if not selected_shot or selected_shot.name == "NONE":
+        self.report({'ERROR'}, "Please select a shot")
+        return {'CANCELLED'}
+    
+    if department.name != "Animation":
+        self.report({'ERROR'}, "Animation folder type must be selected")
+        return {'CANCELLED'}
+    
+    # Use helper to get shot directory and filepath
+    prod_dir = get_prod_dir(context)
+    filepath = set_shot_filepath(prod_dir, selected_ep.name, selected_sequence.name, selected_shot.name, department.name, task_type.name)
+    
+    
+    #Import sound strip
+    if os.path.exists(get_audio_path(prod_dir, selected_ep.name, selected_shot.name)) :
+        import_sound_strip(context)
+    else :
+        self.report({'WARNING'}, "No audio found for this shot")
+    set_frames_timeline(context)
+    #Set base settings for scene
+    set_scene_settings(context)
+
+    #Get previous department and task type to find source file for animation build
+    previous_department = None
+    previous_task_type = None
+    shot = cache.shot_active_get()
+    if shot:
+        task_types = shot.get_all_task_types()
+        task_types_sorted = sorted(task_types, key=lambda t: t.priority)
+        for t in task_types_sorted:
+            if t.name == task_type.name:
+                break
+            previous_task_type = t
+        
+        if previous_task_type:
+            previous_department = previous_task_type.get_department()
+    if not previous_department or not previous_task_type:
+        self.report({'ERROR'}, "No previous department/task type found for this shot")
+        return {'CANCELLED'}
+    
+    source_filepath = get_highest_version_file(
+        set_shot_filepath(prod_dir, selected_ep.name, selected_sequence.name, selected_shot.name, previous_department.name, previous_task_type.name)
+        )
+    
+    if not source_filepath:
+        self.report({'ERROR'}, "No source file found for animation build")
+        return {'CANCELLED'}
+    # copy source file to new filepath & open it
+    try:
+        shutil.copy2(source_filepath, filepath)
+        self.report({'INFO'}, f"Shot saved: {filepath}")
+        bpy.ops.wm.open_mainfile(filepath=filepath)              
+        return {'FINISHED'}
+    except Exception as e:
+        self.report({'ERROR'}, f"Failed to build animation shot: {str(e)}")
+
+def create_empty_scene(context, self):
+    bpy.ops.wm.read_homefile(app_template="")
+
+    for collection in list(bpy.data.collections):
+        bpy.data.collections.remove(collection)
+
+    for obj in list(bpy.data.objects):
+        bpy.data.objects.remove(obj)
+
+    try:            
+        result = link_selected_assets(context)
+        success_count = result['success_count']
+        if success_count == 0:
+            self.report({'ERROR'}, "Failed to link any assets")
+            return {'CANCELLED'}
+    except Exception as e:
+        self.report({'ERROR'}, f"Failed to link assets: {str(e)}")
+        return {'CANCELLED'}      
+
+    # Link sounds
+    try:
+        #Remove sound strips linked from previous shot if exist
+        for sequence in bpy.context.scene.sequence_editor.sequences:
+            if sequence.type == 'SOUND':
+                bpy.context.scene.sequence_editor.sequences.remove(sequence)
+        import_sound_strip(context)
+        self.report({'INFO'}, "Audio linked successfully")
+    except FileNotFoundError as e:
+        self.report({'WARNING'}, str(e))
+    
+    set_frames_timeline(context)
+    #Set base settings for scene
+    set_scene_settings(context)
 
 def get_shot_dir(prod_dir, episode, sequence, shot, department, task_type=None):
     # Default empty string to None for non-Animation folders
@@ -298,7 +482,6 @@ def get_shot_dir(prod_dir, episode, sequence, shot, department, task_type=None):
         task_type = ""
     
     return os.path.join(prod_dir, "screening", episode, "Scenes", sequence, shot, department, task_type)
-
 
 def set_shot_filepath(prod_dir, episode, sequence, shot, department, task_type=None):
     seq = int(sequence or "001")
@@ -316,46 +499,6 @@ def set_shot_filepath(prod_dir, episode, sequence, shot, department, task_type=N
         raise ValueError(f"Unknown type folder: {department}")
     return os.path.join(shot_dir, filename)
 
-
-def get_asset_path(asset_name, asset_dir):
-
-    # parts = asset_name.split('_')
-    # asset_type = "FX" if len(parts) > 2 and parts[2].startswith("FX") else (parts[1] if len(parts) > 1 else None)
-    asset_type = asset_name.split('_')[1] if len(asset_name.split('_')) > 1 else None
-
-    if asset_type == 'CHR':
-        return os.path.join(
-            asset_dir, "Characters", asset_name, 
-            "Final", "Render", f"{asset_name}.blend"
-        )
-    elif asset_type == 'PRP':
-        return os.path.join(
-            asset_dir, "Props", asset_name, 
-            "Final", "Render", f"{asset_name}.blend"
-        )
-    elif asset_type == 'ITM':
-        return os.path.join(
-            asset_dir, "SetItems", asset_name, 
-            "Final", "Render", f"{asset_name}.blend"
-        )
-    elif asset_type == 'SET':
-        return os.path.join(
-            asset_dir, "Sets", asset_name, 
-            "Final", "Render", f"{asset_name}.blend"
-        )
-    # elif asset_type == 'FX':
-    #     return os.path.join(
-    #         asset_dir, "SetItems", asset_name, 
-    #         "Final", "Render", f"{asset_name}.blend"
-    #     )
-    elif asset_name == "MM_Camera":
-        return os.path.join(
-            asset_dir, "Camera", f"{asset_name}.blend"
-        )
-    else:
-        return None
-
-
 def set_frames_timeline(context):
     scene = context.scene
     shot = cache.shot_active_get()
@@ -369,7 +512,7 @@ def set_frames_timeline(context):
         scene.frame_start = 1
         scene.frame_end = shot.nb_frames
 
-
+### Import Asset, Audio & sound
 def get_audio_path(prod_dir, episode, shot):
     """
     Get the full path to an audio file for a given episode and shot.
@@ -382,17 +525,7 @@ def get_audio_path(prod_dir, episode, shot):
     Returns:
         Full path to the audio .wav file
     """
-    audio_folder = os.path.join(
-        prod_dir,
-        "screening",
-        episode,
-        f"EP{episode}_Material",
-        "AUDIO_VIDEO",
-        "Single_Shot_Audio_01",
-    )
-    audio_folder = audio_folder
-    sound_name = f"MM_{episode}_{shot}.wav"
-    return os.path.join(audio_folder, sound_name)
+    return get_media_path("audio", prod_dir, episode, shot)
 
 def import_sound_strip(context):
     scene = context.scene
@@ -451,19 +584,17 @@ def import_image_ref(context):
     episode = cache.episode_active_get()
     shot = cache.shot_active_get()
 
-    image_name = f"MM_{episode.name}_{shot.name}.mov"
-
-    image_path = os.path.join(prod_dir, "screening" , episode.name, f"EP{episode.name}_Material","AUDIO_VIDEO", "Single_Shot_01", image_name)
+    image_path = get_media_path("image_ref", prod_dir, episode.name, shot.name)
 
     # image_data = bpy.data.images.load(image_path, check_existing=True)
-
-    img = bpy.data.images.load(image_path, check_existing=True)
-    camera = scene.camera
-    camera.data.show_background_images = True
-    bg = camera.data.background_images.new()
-    bg.image = img
-    bg.image_user.frame_start = 1
-    bg.image_user.frame_duration = img.frame_duration
+    if os.path.exists(image_path) and os.path.isfile(image_path):
+        img = bpy.data.images.load(image_path, check_existing=True)
+        camera = scene.camera
+        camera.data.show_background_images = True
+        bg = camera.data.background_images.new()
+        bg.image = img
+        bg.image_user.frame_start = 1
+        bg.image_user.frame_duration = img.frame_duration
 
 def create_collection_for_asset(candidate_path):
     """
@@ -561,7 +692,6 @@ def link_and_override_collection(candidate_path):
                 scene=bpy.context.scene,
                 view_layer=bpy.context.view_layer,
                 do_fully_editable=True
-        
         )
         
         else :
@@ -579,7 +709,6 @@ def link_and_override_collection(candidate_path):
         print(f"[ERROR] Échec du link '{expected_name}'")
         print(f"        {e}")
         return None
-
 
 def link_selected_assets(context):
     """Link selected assets for the active shot, including manually-added assets."""
@@ -609,12 +738,15 @@ def link_selected_assets(context):
     if manually_added:
         project_assets = cache.get_all_assets_enum(context, asset_scope='PROJECT')
         # project_assets is now a list of (id, name, description) tuples
-        project_asset_names = {asset_tuple[1] for asset_tuple in project_assets}
+        project_assets_by_name = {asset_tuple[1]: asset_tuple[0] for asset_tuple in project_assets}
         
-        # Find manually-added assets that exist in project assets
-        valid_manually_added = manually_added & project_asset_names
+        # Find manually-added assets that exist in project assets and add them to shot_assets
+        valid_manually_added = manually_added & set(project_assets_by_name.keys())
         for asset_name in valid_manually_added:
-            print(f"Found manually-added asset '{asset_name}' in project assets")
+            asset_id = project_assets_by_name[asset_name]
+            asset_obj = Asset.by_id(asset_id)
+            shot_assets.append(asset_obj)
+            print(f"Added {asset_name} to shot assets from project assets")
     
     
     # print("Assets to link: ", [a.name for a in shot_assets])
@@ -845,7 +977,6 @@ def append_previous_frame_from_previous_shot(scene):
         except Exception as e:
             print(f"[ERROR] Failed to load actions for {asset_name}: {e}")
 
-
 def get_new_output_path(context: bpy.types.Context) -> str | None:
     """Compute and return the output path for the current shot"""
     return set_shot_filepath(
@@ -890,105 +1021,4 @@ def get_sorted_task_types_for_shot(shot):
     task_types = shot.get_all_task_types()
     return sorted(task_types, key=lambda t: t.priority)
 
-def init_modeling_scene_setup():
-    """Set up the scene for modeling tasks (e.g., set viewport to solid, set shading to material preview)"""
-    for area in bpy.context.screen.areas:
-        if area.type == 'VIEW_3D':
-            for space in area.spaces:
-                if space.type == 'VIEW_3D':
-                    space.shading.type = 'MATERIAL'
-                    space.shading.use_scene_lights = True
-                    space.shading.use_scene_world = True
-                    space.viewport_shade = 'MATERIAL'
-    #Find asset in cache with asset type == Camera and link it to the scene, not MM_Camera just the only asset with asset type = Camera
-    #Camera placement : set location to (0,-3,0.5) 
-    # bpy.context.scene.cursor.location = (0, -3, 0.5)
-    camera_assets = [a for a in cache.get_all_assets_enum(bpy.context) if 'Camera' in a.name]
-    if camera_assets:
-        camera_asset = camera_assets[0]
-        asset_path = get_asset_path(camera_asset.name, prefs.asset_dir_get(bpy.context))
-        if asset_path and os.path.exists(asset_path):
-            link_and_override_collection(asset_path)
-
-def init_rigging_scene_setup(asset):
-    asset_name = asset.name
-    task_type_active = cache.task_type_active_get()
-    #Copy modeling file to rigging folder, open copy
-    asset_dir = prefs.asset_dir_get(bpy.context)
-    modeling_path = os.path.join(asset_dir, asset_name, "Modeling", asset_name+"_Modeling"+".blend")
-    if modeling_path and os.path.exists(modeling_path):
-        rigging_path = os.path.join(asset_dir, asset_name, task_type_active.name, asset_name+"_"+task_type_active.short_name+".blend")
-    #append collection with asset name
-    with bpy.data.libraries.load(rigging_path, link=False) as (data_from, data_to):
-        if asset_name in data_from.collections:
-            data_to.collections = [asset_name]
-        else:
-            print(f"[ERROR] Collection '{asset_name}' not found in {rigging_path}")
-            return
-    #Create WGTS collection children asset.name col
-    asset_col = data_to.collections[0]
-
-    wgts_col = bpy.data.collections.new("WGTS")
-    asset_col.children.link(wgts_col)
-    wgts_col.hide_viewport = False
-    
-    rig_col = bpy.data.collections.new(f"{asset_name}_rig")
-    asset_col.children.link(rig_col)
-
-    #Add armature object to rig collection
-    armature_data = bpy.data.armatures.new(f"{asset_name}_rig")
-    armature_obj = bpy.data.objects.new(f"{asset_name}_rig", armature_data)
-    rig_col.objects.link(armature_obj)
-    #Bone creation
-    bpy.ops.object.mode_set(mode='EDIT', toggle=False)
-    pose_bone_data = armature_data.edit_bones.new("pose")
-    traj_bone_data = armature_data.edit_bones.new("traj")
-    pose_bone_data.head = (0, 0, 0)
-    pose_bone_data.tail = (0, 1, 0)
-    traj_bone_data.head = (0, 0, 0)
-    traj_bone_data.tail = (0, 1, 0)
-    traj_bone_data.parent = pose_bone_data
-    bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
-    pose_bone = armature_obj.pose.bones["pose"]
-    traj_bone = armature_obj.pose.bones["traj"]
-
-    #Custom shape cration function 
-    def create_circle_with_arrows(name, col, radius=0.1, arrow_length=0.2):
-        vertices = [(1.5807852745056152, 0.0, 0.0), (1.280785322189331, -0.39509034156799316, 0.0), (1.280785322189331, -0.19509035348892212, 0.0), (0.9807852506637573, -0.19509035348892212, 0.0), (0.9238795042037964, -0.3826834261417389, 0.0), (0.8314696550369263, -0.5555701851844788, 0.0), (0.7071067690849304, -0.7071067690849304, 0.0), (0.5555717945098877, -0.8314685821533203, 0.0), (0.3826850652694702, -0.9238788485527039, 0.0), (0.19509197771549225, -0.9807849526405334, 0.0), (0.19509197771549225, -1.2807848453521729, 0.0), (0.3950919806957245, -1.2807848453521729, 0.0), (0.0, -1.5807849168777466, 0.0), (-0.3950919806957245, -1.2807848453521729, 0.0), (-0.19509197771549225, -1.2807848453521729, 0.0), (-0.19509197771549225, -0.9807849526405334, 0.0), (-0.3826850652694702, -0.9238788485527039, 0.0), (-0.5555717945098877, -0.8314685821533203, 0.0), (-0.7071067690849304, -0.7071067690849304, 0.0), (-0.8314696550369263, -0.5555701851844788, 0.0), (-0.9238795042037964, -0.3826834261417389, 0.0), (-0.9807852506637573, -0.19509035348892212, 0.0), (-1.280785322189331, -0.19509035348892212, 0.0), (-1.280785322189331, -0.39509034156799316, 0.0), (-1.5807852745056152, 0.0, 0.0), (-1.280785322189331, 0.39509034156799316, 0.0), (-1.280785322189331, 0.19509035348892212, 0.0), (-0.9807852506637573, 0.19509035348892212, 0.0), (-0.9238795042037964, 0.3826834261417389, 0.0), (-0.8314696550369263, 0.5555701851844788, 0.0), (-0.7071067690849304, 0.7071067690849304, 0.0), (-0.5555717945098877, 0.8314685821533203, 0.0), (-0.3826850652694702, 0.9238788485527039, 0.0), (-0.19509197771549225, 0.9807849526405334, 0.0), (-0.19509197771549225, 1.2807848453521729, 0.0), (-0.3950919806957245, 1.2807848453521729, 0.0), (0.0, 1.5807849168777466, 0.0), (0.3950919806957245, 1.2807848453521729, 0.0), (0.19509197771549225, 1.2807848453521729, 0.0), (0.19509197771549225, 0.9807849526405334, 0.0), (0.3826850652694702, 0.9238788485527039, 0.0), (0.5555717945098877, 0.8314685821533203, 0.0), (0.7071067690849304, 0.7071067690849304, 0.0), (0.8314696550369263, 0.5555701851844788, 0.0), (0.9238795042037964, 0.3826834261417389, 0.0), (0.9807852506637573, 0.19509035348892212, 0.0), (1.280785322189331, 0.19509035348892212, 0.0), (1.280785322189331, 0.39509034156799316, 0.0)]
-        edges = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7), (7, 8), (8, 9), (9, 10), (10, 11), (11, 12), (12, 13), (13, 14), (14, 15), (15, 16), (16, 17), (17, 18), (18, 19), (19, 20), (20, 21), (21, 22), (22, 23), (23, 24), (24, 25), (25, 26), (26, 27), (27, 28), (28, 29), (29, 30), (30, 31), (31, 32), (32, 33), (33, 34), (34, 35), (35, 36), (36, 37), (37, 38), (38, 39), (39, 40), (40, 41), (41, 42), (42, 43), (43, 44), (44, 45), (45, 46), (46, 47), (47, 0)]
-
-
-        mesh = bpy.data.meshes.new(f"WGT_{name}")
-        obj = bpy.data.objects.new(f"WGT_{name}", mesh)
-
-        col.objects.link(obj)
-
-        mesh.from_pydata(vertices, edges, [])
-        mesh.update()
-
-        return obj
-
-    def create_square(name, col, size=0.6):
-        vertices = [(-size, -size, 0), (size, -size, 0), (size, size, 0), (-size, size, 0)]
-        edges = [(0, 1), (1, 2), (2, 3), (3, 0)]
-
-        mesh = bpy.data.meshes.new(f"WGT_{name}")
-        obj = bpy.data.objects.new(f"WGT_{name}", mesh)
-        
-        col.objects.link(obj)
-
-        mesh.from_pydata(vertices, edges, [])
-        mesh.update()
-
-        return obj
-
-    #Add custom shape to traj, circle with arrow on each side 
-    pose_custom_shape = create_circle_with_arrows(pose_bone_data.name, wgts_col)
-    traj_custom_shape = create_square(traj_bone_data.name, wgts_col)
-
-    pose_bone.custom_shape = pose_custom_shape
-    traj_bone.custom_shape = traj_custom_shape
-
-
-# def update_model(context):
     
