@@ -831,6 +831,7 @@ class Task(Entity):
     shotgun_id: Optional[str] = None
     project_id: str = ""
     task_type_id: str = ""
+    task_type_name: str = ""
     task_status_id: str = ""
     entity_id: str = ""
     assigner_id: str = ""

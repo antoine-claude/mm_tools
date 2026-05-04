@@ -74,12 +74,12 @@ def draw_build_shot_section(context: bpy.types.Context, layout: bpy.types.UILayo
     output_path = get_new_output_path(context)
     highest_version = get_highest_version_file(output_path)
     if not highest_version:
-        if not os.path.exists(os.path.dirname(output_path)):
-            row = layout.row(align=True)
-            row.alignment = 'CENTER'
-            row.label(text=f"Folder {context.scene.kitsu.department_active_name} missing",
-                       icon="ERROR")
-            return
+        # if not os.path.exists(os.path.dirname(output_path)):
+        #     row = layout.row(align=True)
+        #     row.alignment = 'CENTER'
+        #     row.label(text=f"Folder {context.scene.kitsu.department_active_name} missing",
+        #                icon="ERROR")
+        #     return
         # Build shot button - conditional based on type_folder
         layout.operator(
             "kitsu.build_shot",
@@ -302,18 +302,8 @@ def init_layout_shot(self, context):
         self.report({'ERROR'}, "This shot already exist")
         return {'CANCELLED'}
     
-    #Look old shot-
-    all_shots = selected_sequence.get_all_shots()
-
-    for i, shot in enumerate(all_shots):
-        if shot.name == selected_shot.name and i > 0:
-            # print("shot.name == selected_shot",shot.name)
-            prev_shot = all_shots[i - 1]
-            prev_shot_name = prev_shot.name
-            break
-    
     #Create file from last shot or from 0 
-    if prev_shot_name and self.confirm_copy:
+    if self.confirm_copy:
 
         prev_task_type = TaskType.by_id(self.previous_shot_task_type)
         prev_department = prev_task_type.get_department()
@@ -322,19 +312,20 @@ def init_layout_shot(self, context):
             prod_dir,
             selected_ep.name,
             selected_sequence.name,
-            prev_shot_name,
+            scene.kitsu.previous_shot_name,
             prev_department.name,
             prev_task_type.name,
         )
 
         if os.path.exists(prev_filepath):
+            print("copy previous shot")
             shutil.copy(prev_filepath, filepath)
         else:
-            self.report({'WARNING'}, "Previous file not found, creating empty scene")
-            create_empty_scene(context, self)
+            self.report({'INFO'}, "Previous file not found, creating empty scene")
+            create_empty_scene(self, context)
 
     else:
-        create_empty_scene(context, self)
+        create_empty_scene(self, context)
 
 
     #Set camera
@@ -346,11 +337,11 @@ def init_layout_shot(self, context):
     try:
         import_sound_strip(context)
         self.report({'INFO'}, "Audio linked successfully")
-    except FileNotFoundError as e:
+    except Exception as e:
         self.report({'WARNING'}, str(e))
     try :
         import_image_ref(context)
-    except FileNotFoundError as e:
+    except Exception as e:
         self.report({'WARNING'}, str(e))
 
     set_frames_timeline(context)
@@ -442,8 +433,29 @@ def init_animation_shot(self, context):
     except Exception as e:
         self.report({'ERROR'}, f"Failed to build animation shot: {str(e)}")
 
-def create_empty_scene(context, self):
+def create_empty_scene(self, context):
+    self.report({'INFO'}, "Build From scratch")
+    #register value
+    kitsu_scene = context.scene.kitsu
+    buildshot_props = {
+        attr_name: getattr(kitsu_scene, attr_name)
+        for attr_name in dir(kitsu_scene)
+        if attr_name.startswith("buildshot_")
+    }
+    # self.report({'INFO'}, f"{buildshot_props.items()}")
     bpy.ops.wm.read_homefile(app_template="")
+
+    # `read_homefile()` recreates scene data, so refresh the Kitsu props reference.
+    kitsu_scene = context.scene.kitsu
+    
+    #apply value
+    for prop_name in dir(kitsu_scene):
+        if not prop_name.startswith("buildshot_"): continue
+        if prop_name in buildshot_props:
+            setattr(kitsu_scene, prop_name, buildshot_props[prop_name])
+            # self.report({'INFO'}, f"prop name value : {prop_name} : {getattr(kitsu_scene, prop_name)}")
+            
+    # bpy.context.view_layer.update()    
 
     for collection in list(bpy.data.collections):
         bpy.data.collections.remove(collection)
@@ -452,7 +464,7 @@ def create_empty_scene(context, self):
         bpy.data.objects.remove(obj)
 
     try:            
-        result = link_selected_assets(context)
+        result = link_selected_assets(self, context)
         success_count = result['success_count']
         if success_count == 0:
             self.report({'ERROR'}, "Failed to link any assets")
@@ -460,21 +472,6 @@ def create_empty_scene(context, self):
     except Exception as e:
         self.report({'ERROR'}, f"Failed to link assets: {str(e)}")
         return {'CANCELLED'}      
-
-    # Link sounds
-    try:
-        #Remove sound strips linked from previous shot if exist
-        for sequence in bpy.context.scene.sequence_editor.sequences:
-            if sequence.type == 'SOUND':
-                bpy.context.scene.sequence_editor.sequences.remove(sequence)
-        import_sound_strip(context)
-        self.report({'INFO'}, "Audio linked successfully")
-    except FileNotFoundError as e:
-        self.report({'WARNING'}, str(e))
-    
-    set_frames_timeline(context)
-    #Set base settings for scene
-    set_scene_settings(context)
 
 def get_shot_dir(prod_dir, episode, sequence, shot, department, task_type=None):
     # Default empty string to None for non-Animation folders
@@ -538,9 +535,11 @@ def import_sound_strip(context):
     sound_path = get_audio_path(prod_dir, ep, shot)
 
     # Validate file existence before attempting to load
-    if not os.path.isfile(sound_path):
-        msg = f"Audio file not found: {sound_path}"
-        return None
+    try:
+        if not os.path.isfile(sound_path):
+            msg = f"Audio file not found: {sound_path}"
+    except Exception as e:
+        print(f"Failed to find sound file: {e}")
 
     # try:
     #     sound_data = bpy.data.sounds.load(sound_path, check_existing=True)
@@ -587,14 +586,14 @@ def import_image_ref(context):
     image_path = get_media_path("image_ref", prod_dir, episode.name, shot.name)
 
     # image_data = bpy.data.images.load(image_path, check_existing=True)
-    if os.path.exists(image_path) and os.path.isfile(image_path):
-        img = bpy.data.images.load(image_path, check_existing=True)
-        camera = scene.camera
-        camera.data.show_background_images = True
-        bg = camera.data.background_images.new()
-        bg.image = img
-        bg.image_user.frame_start = 1
-        bg.image_user.frame_duration = img.frame_duration
+    # if os.path.exists(image_path) and os.path.isfile(image_path):
+    img = bpy.data.images.load(image_path, check_existing=True)
+    camera = scene.camera
+    camera.data.show_background_images = True
+    bg = camera.data.background_images.new()
+    bg.image = img
+    bg.image_user.frame_start = 1
+    bg.image_user.frame_duration = img.frame_duration
 
 def create_collection_for_asset(candidate_path):
     """
@@ -710,7 +709,7 @@ def link_and_override_collection(candidate_path):
         print(f"        {e}")
         return None
 
-def link_selected_assets(context):
+def link_selected_assets(self, context):
     """Link selected assets for the active shot, including manually-added assets."""
     scene = context.scene
     kitsu_scene = scene.kitsu
@@ -725,14 +724,13 @@ def link_selected_assets(context):
     
     # Build set of shot asset names for efficient lookup
     shot_asset_names = {a.name for a in shot_assets}
-    
+
     # Find and add manually-added assets from project assets
     buildshot_props = {
         attr_name.replace("buildshot_", ""): attr_name
         for attr_name in dir(kitsu_scene)
         if attr_name.startswith("buildshot_")
     }
-    
     manually_added = {name for name in buildshot_props.keys() if name not in shot_asset_names}
     
     if manually_added:
@@ -763,7 +761,6 @@ def link_selected_assets(context):
             prop_name = f"buildshot_{asset_name}"
             if hasattr(kitsu_scene, prop_name) and not getattr(kitsu_scene, prop_name):
                 continue
-        
         # Get and validate asset path
         asset_path = get_asset_path(asset_name, asset_dir)
         if asset_path is None:

@@ -1,5 +1,6 @@
 import bpy
 import os
+from .core import *
 from bpy.types import Operator
 from .. import cache, prefs
 from ..types import (
@@ -22,7 +23,9 @@ class BUILD_ASSET_OT_build_asset_modeling(Operator):
         asset_type = cache.asset_type_active_get()
         asset = cache.asset_active_get()
         task_type = cache.task_type_active_get()
-        
+        print("working_file", asset_path(asset))
+        print(os.path.exists(asset_path(asset)))
+        return {'FINISHED'}
 
 class BUILD_ASSETS_OT_build(Operator):
     bl_idname = "kitsu.build_assets"
@@ -67,6 +70,7 @@ class BUILD_ASSETS_OT_build(Operator):
 
 classes = (
     BUILD_ASSETS_OT_build,
+    BUILD_ASSET_OT_build_asset_modeling,
 )
 
 

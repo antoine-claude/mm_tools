@@ -36,13 +36,13 @@ def run_path_check():
     filepath = bpy.data.filepath
     filename = bpy.path.basename(filepath)
 
-    # Fichier non enregistré
-    if not filepath:
-        bpy.ops.wm.check_project_path_popup(
-            "INVOKE_DEFAULT",
-            message="Le fichier n'a pas encore été enregistré !"
-        )
-        return
+    # # Fichier non enregistré
+    # if not filepath:
+    #     bpy.ops.wm.check_project_path_popup(
+    #         "INVOKE_DEFAULT",
+    #         message="Le fichier n'a pas encore été enregistré !"
+    #     )
+    #     return
 
     # Mauvais chemin + nom commençant par MM_
     if not filepath.startswith(TARGET_PATH) and filename.startswith("MM_"):

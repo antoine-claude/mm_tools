@@ -14,7 +14,7 @@ import importlib
 bl_info = {
     "name": "MM Tools",
     "author": "Antoine C",
-    "version": (0, 0, 8, 52),
+    "version": (0, 0, 8, 53),
 }
 
 

@@ -118,11 +118,19 @@ class BUILD_SHOT_property_group(bpy.types.PropertyGroup):
         search_options={'SORT'},
     )
 
+    def get_assets(self):
+        return self.get("_assets_expanded", True)
+
+    def set_assets(self, value):
+        self["_assets_expanded"] = value
+
     # Collapse/expand assets section
     assets_expanded: bpy.props.BoolProperty(
         name="Assets",
         description="Expand/collapse assets linking section",
-        default=True
+        default= True,
+        get=get_assets,
+        set=set_assets
     )
 
 classes = (BUILD_SHOT_property_group,)

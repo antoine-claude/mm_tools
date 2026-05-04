@@ -21,7 +21,7 @@ class BUILD_SHOT_PT_main_panel(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "Kitsu"
-    bl_options = {"DEFAULT_CLOSED"}
+    # bl_options = {"DEFAULT_CLOSED"}
     bl_order = 30
 
     @classmethod

@@ -2,13 +2,14 @@
 Operators for build_shot addon
 Provides operators for linking assets, refreshing cache, and saving
 """
+import re
 import shutil
 
 import bpy
 import os
 from bpy.types import Operator
 from .. import cache, prefs
-from .core import import_sound_strip, import_image_ref, init_animation_shot, init_layout_shot, set_shot_filepath, link_selected_assets, get_highest_version_file, get_audio_path, set_scene_settings, set_frames_timeline, get_sorted_task_types_for_shot
+from .core import get_new_output_path, import_sound_strip, import_image_ref, init_animation_shot, init_layout_shot, set_shot_filepath, link_selected_assets, get_highest_version_file, get_audio_path, set_scene_settings, set_frames_timeline, get_sorted_task_types_for_shot
 from ..build_asset.core import init_modeling_scene_setup, init_rigging_scene_setup
 from ..types import (
     Shot,
@@ -31,7 +32,7 @@ class BUILD_SHOT_OT_link_selected_assets(Operator):
         prod_dir = str(prefs.project_root_dir_get(context))
             
         try:
-            result = link_selected_assets(context)
+            result = link_selected_assets(self, context)
             success_count = result['success_count']
             failed_assets = result['failed_assets']
             if success_count > 0:
@@ -105,7 +106,13 @@ class BUILD_SHOT_OT_link_audio(Operator):
     def execute(self, context):
         scene = context.scene
         try:
-            import_sound_strip(context)
+            sound = import_sound_strip(context)
+            if sound:
+                self.report({'INFO'}, "Audio linked successfully")
+                return {'FINISHED'}
+            else :
+                self.report({'ERROR'}, f"Failed to link audio")
+                return {'CANCELLED'}
             return {'FINISHED'}
         except FileNotFoundError as e:
             self.report({'ERROR'}, str(e))
@@ -124,8 +131,14 @@ class BUILD_SHOT_OT_link_image_ref(Operator):
     def execute(self, context):
         scene = context.scene
         try:
-            import_image_ref(context)
-            return {'FINISHED'}
+            image = import_image_ref(context)
+            if image:
+                self.report({'INFO'}, "Image reference linked successfully")
+                return {'FINISHED'}
+            else :
+                self.report({'ERROR'}, f"Failed to link any image reference")
+                return {'CANCELLED'}    
+
         except FileNotFoundError as e:
             self.report({'ERROR'}, str(e))
             return {'CANCELLED'}
@@ -180,7 +193,9 @@ class BUILD_SHOT_OT_build_shot(Operator):
         department = cache.department_active_get()
         task_type = cache.task_type_department_active_get()
         # output_path = scene.build_shot.output_path
-        
+
+        output_path = get_new_output_path(context)
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
         if not selected_ep or selected_ep.name == "NONE":
             self.report({'ERROR'}, "Please select an episode")
             return {'CANCELLED'}
@@ -212,15 +227,16 @@ class BUILD_SHOT_OT_build_shot(Operator):
     def invoke(self, context, event):
         # items = [("NONE", "None", "Create from scratch")]
         # items.append(cache.get_shot_task_types_enum_for_shot)
-
         return context.window_manager.invoke_props_dialog(self)
 
     def draw(self, context):
         layout = self.layout
 
         layout.label(text="Create shot from:")
-        layout.prop(self, "confirm_copy", text="Copy previous shot")
+        layout.prop(self, "confirm_copy", text="Build from a previous shot")
         if self.confirm_copy :
+            
+            layout.prop(context.scene.kitsu, "previous_shot_name", text="")
             layout.prop(self, "previous_shot_task_type", text="")
 
 

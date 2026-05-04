@@ -1,5 +1,12 @@
 import bpy
 import os
+import gazu
+from dataclasses import asdict, is_dataclass
+
+from ..types import (
+    Asset,
+    Department,
+    )
 from .. import cache, bkglobals, prefs
 from ..build_shot.core import link_and_override_collection
 
@@ -41,9 +48,27 @@ def get_asset_path(asset_name, asset_dir):
         )
     else:
         return None
-    
+
+def asset_path(asset: Asset) -> str:
+    #Gather asset path with gazu.files.get_working_files_for_task*
+    #Get task for asset 
+    asset_active = cache.asset_active_get()
+    all_asset_task = asset_active.get_all_tasks()
+    task_type_active = cache.task_type_active_get()
+    # if asset_active and task_type_active:
+    for task in all_asset_task:
+        if task.task_type_id == task_type_active.id:
+            # print("task_type_name", task.task_type_name, task_type_active.name)
+            task_payload = asdict(task) if is_dataclass(task) else task
+            # print("task",task_payload)
+            working_files = gazu.files.get_working_files_for_task(task_payload)
+            if working_files:
+                return working_files[0]["path"]
+            
+
 def init_modeling_scene_setup():
     """Set up the scene for modeling tasks (e.g., set viewport to solid, set shading to material preview)"""
+    asset = cache.asset_active_get()
     for area in bpy.context.screen.areas:
         if area.type == 'VIEW_3D':
             for space in area.spaces:
@@ -55,12 +80,18 @@ def init_modeling_scene_setup():
     #Find asset in cache with asset type == Camera and link it to the scene, not MM_Camera just the only asset with asset type = Camera
     #Camera placement : set location to (0,-3,0.5) 
     # bpy.context.scene.cursor.location = (0, -3, 0.5)
+    #Link camera
     camera_assets = [a for a in cache.get_all_assets_enum(bpy.context) if 'Camera' in a.name]
     if camera_assets:
         camera_asset = camera_assets[0]
-        asset_path = get_asset_path(camera_asset.name, prefs.asset_dir_get(bpy.context))
+        asset_path = asset_path(camera_asset)
         if asset_path and os.path.exists(asset_path):
             link_and_override_collection(asset_path)
+    #
+    asset_path = asset_path(asset)
+    if asset_path and os.path.exists(asset_path):
+        link_and_override_collection(asset_path)
+
 
 def init_shading_scene_setup(asset) :
     asset_name = asset.name

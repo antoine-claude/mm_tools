@@ -71,7 +71,7 @@ class BUILD_ASSET_PT_main_panel(Panel):
         #     context_core.draw_task_type_selector(context, col)
 
         row = col.row()
-        row.operator("kitsu.build_assets", text=f"Build Asset {task_type.name}")
+        row.operator("kitsu.build_asset_modeling", text=f"Build Asset {task_type.name}")
 
 classes = (
     BUILD_ASSET_PT_main_panel,

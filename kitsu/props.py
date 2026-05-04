@@ -334,6 +334,53 @@ class KITSU_property_group_scene(bpy.types.PropertyGroup):
         search_options={'SORT'},
     )
 
+    PRV_SHOT_NAME_PROP = "previous_shot_name"
+
+    def get_prv_shot_via_name(self):
+        # 1. Si une valeur est déjà stockée → on l'utilise
+        stored_value = self.get(self.PRV_SHOT_NAME_PROP, "")
+        if stored_value != "":
+            return stored_value
+
+        # 2. Sinon → valeur par défaut = shot précédent
+        active_shot = cache.shot_active_get()
+        if not active_shot:
+            return ""
+
+        shots = cache.get_shots_enum_for_active_seq(self, bpy.context)
+        active_name = active_shot.name
+
+        for i, shot in enumerate(shots):
+            if (
+                isinstance(shot, (list, tuple))
+                and len(shot) >= 2
+                and shot[1] == active_name
+            ):
+                if i > 0:
+                    prev = shots[i - 1]
+                    if isinstance(prev, (list, tuple)) and len(prev) >= 2:
+                        return prev[1]
+                break
+
+        return ""
+
+    def set_prv_shot_via_name(self, input):
+        valid_shot_names = get_enum_item_names(cache.get_shots_enum_for_active_seq(self, bpy.context))
+        if input in valid_shot_names or input == "":
+            self[self.PRV_SHOT_NAME_PROP] = input
+
+
+    previous_shot_name: bpy.props.StringProperty(
+        name="Previous Shot",
+        description="Name of the previous shot in the sequence",
+        default="",  # type: ignore
+        get=get_prv_shot_via_name,
+        set=set_prv_shot_via_name,
+        options=set(),
+        search=get_shot_search_list,
+        search_options={'SORT'},
+    )
+
     ###########
     # Asset
     ###########
@@ -675,6 +722,8 @@ class KITSU_property_group_scene(bpy.types.PropertyGroup):
         description="Automatically upload the playblast to Kitsu after it's done and set the playblast task status to 'playblast_uploaded'",
         default=True,
     )
+
+    
 
     # Sequence editor tools.
     pull_edit_channel: bpy.props.IntProperty(
