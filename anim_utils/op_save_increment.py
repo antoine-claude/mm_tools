@@ -21,10 +21,10 @@ def parsed_filepath(filepath):
 def increment_number(parsed_filepath):
     parsed, ext = parsed_filepath
     # gestion vXX
-    if len(parsed) > 1 and parsed[-2].startswith("v"):
-        current_version = int(parsed[-2][1:])
+    if len(parsed) > 1 and parsed[5].startswith("v"):
+        current_version = int(parsed[5][1:])
         new_version = current_version + 1
-        parsed[-2] = f"v{new_version:02d}"
+        parsed[5] = f"v{new_version:02d}"
 
     return parsed, ext
 
@@ -171,7 +171,7 @@ class WM_OT_save_mainfile_incremental(bpy.types.Operator):
         new_filepath = save_with_incremental(filepath)
 
         # If filename doesn't contain vXX, infer next version from JSON log
-        if not parsed[-2].startswith("v"):
+        if not parsed[5].startswith("v"):
             last_version = "v01"
             entries = load_log_entries_json(filepath)
             if entries:
@@ -184,10 +184,10 @@ class WM_OT_save_mainfile_incremental(bpy.types.Operator):
                 except Exception:
                     pass
             print("update parsed version to", last_version)
-            parsed[-2] = last_version
+            parsed[5] = last_version
 
         # Write JSON log entry (version, comment)
-        write_log(new_filepath, parsed[-2], comment)
+        write_log(new_filepath, parsed[5], comment)
 
         # nettoyage
         comment = ""

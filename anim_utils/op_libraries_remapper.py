@@ -21,6 +21,7 @@ class OT_RemapPaths(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     remap_items: CollectionProperty(type=RemapItem)
+    check_all: BoolProperty(name="Select All", default=False, update=lambda self, context: [setattr(item, "select", self.check_all) for item in self.remap_items]   )
 
     def invoke(self, context, event):
         self.remap_items.clear()
@@ -65,6 +66,9 @@ class OT_RemapPaths(Operator):
         layout.label(text="Libraries to Remap:", icon="FILE_FOLDER")
 
         col = layout.column(align=True)
+
+        col.prop(self, "check_all", text="Select All")
+        
         for item in self.remap_items:
             row = col.row(align=True)
             row.prop(item, "select", text="")  # ✅ Checkbox booléenne
